@@ -1,0 +1,22 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+
+# Never commit browser state or captured private data.
+.runtime/
+profiles/
+browser-state/
+screenshots/
+downloads/
+*.har
+*.webm
+*.mp4
+*.m4s
+*.m3u8
+*.trace.zip
+
+.DS_Store
+Thumbs.db

@@ -1,0 +1,35 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+
+test("companion context is anchored to the user's delayed HLS clock", () => {
+  const mcp = fs.readFileSync(new URL("../src/mcp-server.ts", import.meta.url), "utf8");
+  assert.match(mcp, /"browser_companion_context"/);
+  assert.ok(mcp.includes('gateway.call("browser_media_context",'));
+  assert.ok(!mcp.includes('gateway.call("browser_audio_vision",'));
+  assert.match(mcp, /getCompanionPlaybackStatus/);
+  assert.match(mcp, /playbackFresh/);
+  assert.match(mcp, /cue.startTime <= delayedCutoff/);
+  assert.match(mcp, /source: "companion-hls-buffer"/);
+  assert.match(mcp, /Realtime source audio is intentionally excluded/);
+  assert.match(mcp, /futureSubtitleCuesReturned: false/);
+  assert.match(mcp, /rawAudioTransferredToModel: false/);
+  assert.match(mcp, /noSubtitleHeartbeatSeconds: 10/);
+  assert.match(mcp, /screenshotAutomatic: false/);
+  assert.match(mcp, /lastVisualInspectionAt/);
+  assert.match(mcp, /assessCompanionVisualCue/);
+  assert.match(mcp, /coordinateAuthority: false/);
+  assert.match(mcp, /bufferedCoordinatesReusable: false/);
+  assert.match(mcp, /requireRealtimePageState: true/);
+  assert.match(mcp, /requireTargetIdentityRevalidation: true/);
+  assert.match(mcp, /mediaControlsImmediate: true/);
+  assert.match(mcp, /"browser_companion_commit"/);
+  assert.match(mcp, /perceptionReceipt/);
+  assert.match(mcp, /solCommittedPts/);
+  assert.match(mcp, /staleResultRejected/);
+  assert.ok(!mcp.includes("onCompanionActivity"));
+  assert.match(mcp, /"browser_companion_frame"/);
+  assert.match(mcp, /preferredVisualSource: "companion-hls-buffer"/);
+  assert.match(mcp, /fallbackScreenshotUsed: false/);
+  assert.match(mcp, /futureFrameReturned: false/);
+});
