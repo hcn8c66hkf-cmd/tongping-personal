@@ -1,11 +1,40 @@
-export const BROWSER_APP_URI = "ui://tongping/shared-browser-v97";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
-// ngrok's free browser interstitial can replace a same-origin module request
-// with HTML. The card shell then renders, but none of its controls can start.
-// Load the public, version-pinned MCP Apps bridge from an already allowlisted
-// static origin so the card can bootstrap reliably through free tunnels.
-const MCP_APP_BRIDGE_URL =
-  "https://cdn.jsdelivr.net/npm/@modelcontextprotocol/ext-apps@2.0.3/dist/src/app-with-deps.js";
+export const BROWSER_APP_URI = "ui://tongping/shared-browser-v98";
+
+// Keep the MCP Apps bridge inside the component HTML. A second module request
+// could be blocked or time out in the ChatGPT iOS component sandbox, leaving
+// the whole card at "Unable to open" before any of our diagnostics ran.
+// app-with-deps is already bundled; replace its final ESM export list with the
+// four local bindings used by this component.
+function inlineMcpAppBridge(): string {
+  const source = readFileSync(
+    fileURLToPath(import.meta.resolve("@modelcontextprotocol/ext-apps/app-with-deps")),
+    "utf8",
+  );
+  const exportAt = source.lastIndexOf("export{");
+  if (exportAt < 0) {
+    throw new Error("MCP Apps bridge export list was not found");
+  }
+  const exportList = source.slice(exportAt);
+  const localName = (exportedName: string): string => {
+    const match = exportList.match(
+      new RegExp("([A-Za-z_$][A-Za-z0-9_$]*) as " + exportedName + "(?:[,}])"),
+    );
+    if (!match) throw new Error("MCP Apps bridge export missing: " + exportedName);
+    return match[1]!;
+  };
+  return (
+    source.slice(0, exportAt) +
+    `const App=${localName("App")},` +
+    `applyDocumentTheme=${localName("applyDocumentTheme")},` +
+    `applyHostStyleVariables=${localName("applyHostStyleVariables")},` +
+    `applyHostFonts=${localName("applyHostFonts")};`
+  );
+}
+
+const MCP_APP_BRIDGE_SOURCE = inlineMcpAppBridge();
 
 export function browserAppPublicOrigin(): string {
   const value =
@@ -21,7 +50,6 @@ export function browserAppUiDomain(): string | undefined {
 
 export function renderBrowserApp(publicOrigin: string): string {
   const baseOrigin = publicOrigin.replace(/\/+$/, "");
-  const assetUrl = MCP_APP_BRIDGE_URL;
   const brandIconUrl = `${baseOrigin}/assets/tongping-icon.png`;
 
   return `<!doctype html>
@@ -1533,7 +1561,7 @@ button.on{background:var(--accent-soft);border-color:var(--border);color:var(--a
   </div>
 </div>
 <script type="module">
-import { App, applyDocumentTheme, applyHostStyleVariables, applyHostFonts } from ${JSON.stringify(assetUrl)};
+${MCP_APP_BRIDGE_SOURCE}
 
 const $ = (id) => document.getElementById(id);
 const app = new App(

@@ -23,7 +23,7 @@
     "room:watch": "node scripts/room-watch.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^2.0.0",
+    "@modelcontextprotocol/ext-apps": "2.0.3",
     "@modelcontextprotocol/node": "^2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "opusscript": "^0.1.1",

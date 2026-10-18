@@ -27,7 +27,7 @@ test("worker media recorder uses timeslice as primary clock and requestData only
 });
 
 test("app v60 remains compatible with cached v59 cards", () => {
-  assert.ok(app.includes("shared-browser-v97"));
+  assert.ok(app.includes("shared-browser-v98"));
   const mcp = fs.readFileSync(new URL("../src/mcp-server.ts", import.meta.url), "utf8");
   assert.ok(mcp.includes("shared-browser-v59"));
 });

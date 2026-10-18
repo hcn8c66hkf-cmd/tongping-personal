@@ -7,12 +7,10 @@ import {
 } from "../src/browser-app.js";
 import { LocalGateway } from "../src/gateway.js";
 
-test("browser app uses official MCP Apps bridge without daemon credentials", () => {
+test("browser app inlines the official MCP Apps bridge without daemon credentials", () => {
   const html = renderBrowserApp("https://browser.example");
-  assert.match(
-    html,
-    /https:\/\/cdn\.jsdelivr\.net\/npm\/@modelcontextprotocol\/ext-apps@2\.0\.3\/dist\/src\/app-with-deps\.js/,
-  );
+  assert.doesNotMatch(html, /app-with-deps\.js/);
+  assert.doesNotMatch(html, /import\s*\{\s*App/);
   assert.doesNotMatch(html, /browser\.example\/assets\/mcp-app-v2\.js/);
   assert.match(html, /new App\(/);
   assert.match(html, /app\.callServerTool/);
