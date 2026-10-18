@@ -82,6 +82,6 @@ test("app exposes delayed companion as a distinct mode and fresh resource", () =
   assert.match(app, /let companionModeActive = false/);
   assert.match(app, /"companion_ready"/);
   assert.match(app, /companionPlaylistUrl/);
-  assert.match(app, /shared-browser-v94/);
+  assert.match(app, /shared-browser-v95/);
   assert.match(app, /延迟约/);
 });
