@@ -12,7 +12,7 @@ test("show-to-ai button is visible in the mode bar", () => {
     'id="showToAi"',
     'id="showToAiLabel">叫大家看',
     '把你现在看到的这一帧分享给群里的 AI 看',
-    'shared-browser-v100',
+    'shared-browser-v101',
   ]) {
     assert.ok(app.includes(token), token);
   }

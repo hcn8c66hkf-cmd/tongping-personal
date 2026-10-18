@@ -227,6 +227,7 @@ interface Session {
   sourceTimeline: CompanionSourceTimelineAnchor | null;
   sourceSamples: CompanionSourceTimelineAnchor[];
   encodedSeconds: number;
+  encodedFrames: number;
   lastEncodedAt: number;
   // While the viewer has companion paused the recorder is paused too; no
   // source samples are taken then (the source is held still).
@@ -374,6 +375,7 @@ export class DelayedCompanionHls {
       sourceTimeline,
       sourceSamples: sourceTimeline ? [sourceTimeline] : [],
       encodedSeconds: 0,
+      encodedFrames: 0,
       lastEncodedAt: 0,
       pausedSince: null,
       quickResume: Date.now() - (this.lastEndedAt.get(profile) ?? 0) < QUICK_RESUME_WINDOW_MS,
@@ -393,6 +395,14 @@ export class DelayedCompanionHls {
       const lines = progressTail.split(/\r?\n/);
       progressTail = lines.pop() ?? "";
       for (const line of lines) {
+        const frameMatch = /^frame=(\d+)$/.exec(line);
+        if (frameMatch) {
+          session.encodedFrames = Math.max(
+            session.encodedFrames,
+            Number(frameMatch[1]) || 0,
+          );
+          continue;
+        }
         const match = /^out_time_us=(\d+)$/.exec(line);
         if (!match) continue;
         const seconds = Number(match[1]) / 1_000_000;
@@ -1117,6 +1127,7 @@ export class DelayedCompanionHls {
         bytesIn: session.bytesIn,
         chunksIn: session.chunksIn,
         encodedSeconds: session.encodedSeconds,
+        encodedFrames: session.encodedFrames,
         lastEncodedAgeMs:
           session.lastEncodedAt > 0
             ? Date.now() - session.lastEncodedAt

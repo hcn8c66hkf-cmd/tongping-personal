@@ -2823,7 +2823,7 @@ export class BrowserManager {
               // Never as a getDisplayMedia constraint: with the Windows session
               // locked that request fails outright ("Could not start video
               // source"); a refused resize just records at the tab's own size.
-              if (preferH264 && tracks[0]) {
+              if (tracks[0]) {
                 await tracks[0]
                   .applyConstraints({ width: { max: 1280 }, height: { max: 720 }, frameRate: { ideal: 20, max: 20 } })
                   .catch(() => {});
@@ -2872,8 +2872,10 @@ export class BrowserManager {
                 mimeType,
                 videoBitsPerSecond,
                 ...(includeAudio ? { audioBitsPerSecond } : {}),
-                // HLS segments cut on key frames: one every 2 s.
-                ...(mimeType.includes("h264") ? { videoKeyFrameIntervalDuration: 2000 } : {}),
+                // Every recorder codec needs an early, regular key frame.
+                // Without this Chrome's VP8 tab capture can deliver audio
+                // chunks while ffmpeg waits indefinitely for decodable video.
+                videoKeyFrameIntervalDuration: 2000,
               } as MediaRecorderOptions);
 
               // Tap the same captured audio for local speech-to-text:

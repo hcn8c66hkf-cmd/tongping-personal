@@ -4,6 +4,7 @@ export interface CompanionHlsLiveness {
   chunksIn: number;
   lastChunkAgeMs: number | null;
   encodedSeconds?: number;
+  encodedFrames?: number;
 }
 
 export function companionHlsRecoveryReason(
@@ -25,7 +26,7 @@ export function companionHlsRecoveryReason(
   if (
     session.ageMs >= 20_000 &&
     session.chunksIn >= 10 &&
-    (session.encodedSeconds ?? 0) < 0.5
+    ((session.encodedSeconds ?? 0) < 0.5 || (session.encodedFrames ?? 0) < 1)
   ) {
     return "no-output";
   }

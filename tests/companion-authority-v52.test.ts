@@ -40,5 +40,5 @@ test("companion entry shuts down realtime audio before starting delayed capture"
   const body = app.slice(start, end);
   assert.ok(body.includes("closeAudioSocket(true)"));
   assert.ok(body.indexOf("closeAudioSocket(true)") < body.indexOf("companionModeActive = true"));
-  assert.ok(app.includes("shared-browser-v100"));
+  assert.ok(app.includes("shared-browser-v101"));
 });

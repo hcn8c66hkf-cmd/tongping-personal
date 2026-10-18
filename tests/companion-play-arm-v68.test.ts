@@ -29,5 +29,5 @@ test("playwait survives repeated companion self-heals", () => {
 });
 
 test("App v89 is the fresh resource identity", () => {
-  assert.ok(app.includes("shared-browser-v100"));
+  assert.ok(app.includes("shared-browser-v101"));
 });
