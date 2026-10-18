@@ -18,8 +18,12 @@ const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const envFile = path.join(root, ".env");
 const env = readEnvFile(envFile);
 const port = env.TONGPING_PORT?.trim() || "45921";
+const bundledNgrok = path.join(root, "ngrok.exe");
+const ngrokCommand = process.platform === "win32" && existsSync(bundledNgrok)
+  ? bundledNgrok
+  : "ngrok";
 
-const version = spawnSync("ngrok", ["version"], {
+const version = spawnSync(ngrokCommand, ["version"], {
   encoding: "utf8",
   windowsHide: true,
 });
@@ -38,13 +42,12 @@ if (publicOrigin) {
 } else {
   console.log("正在连接固定 ngrok 隧道……");
   ngrok = spawn(
-    "ngrok",
+    ngrokCommand,
     [
       "http",
       port,
       "--log=stdout",
       "--log-format=logfmt",
-      "--web-addr=127.0.0.1:4040",
     ],
     {
       cwd: root,
