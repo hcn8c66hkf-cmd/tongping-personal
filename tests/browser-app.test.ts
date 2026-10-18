@@ -40,6 +40,9 @@ test("browser app uses official MCP Apps bridge without daemon credentials", () 
   assert.match(html, /id="back"/);
   assert.match(html, /id="forward"/);
   assert.match(html, /复制链接地址/);
+  assert.match(html, /禁言设置没同步，请再点一次/);
+  assert.match(html, /response\.status === 403/);
+  assert.match(html, /await refreshFrame\(\)/);
   assert.match(html, /safe-area-inset-top/);
   assert.match(html, /shell\.fullscreen/);
   assert.match(html, /grid-template-areas/);
