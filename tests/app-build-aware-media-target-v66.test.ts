@@ -15,7 +15,7 @@ test("stable media socket target ignores exp/sig but includes app_build", () => 
 });
 
 test("App v66 build change can force media socket replacement", () => {
-  assert.ok(app.includes("shared-browser-v101"));
+  assert.ok(app.includes("shared-browser-v102"));
   const start = app.indexOf('if (typeof next.mediaUrl === "string")');
   const end = app.indexOf('if (typeof next.inputUrl === "string")', start);
   const block = app.slice(start, end);

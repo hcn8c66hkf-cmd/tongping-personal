@@ -14,9 +14,9 @@ import {
 // without a full HLS session.
 const videoFilter = COMPANION_VIDEO_FILTER.split(",scale=")[0]!;
 const audioFilter = COMPANION_AUDIO_FILTER;
-const videoDelay = Number(COMPANION_VIDEO_FILTER.match(/PTS\+([0-9.]+)\/TB/)![1]);
+const videoDelay = Number(COMPANION_VIDEO_FILTER.match(/eq\(N,0\),([0-9.]+)\/TB/)![1]);
 
-test("video that starts after audio keeps that offset instead of leading the sound", (t) => {
+test("unrelated recorder PTS origins are normalized before HLS muxing", (t) => {
   if (spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status !== 0) {
     t.skip("ffmpeg is unavailable");
     return;
@@ -52,13 +52,13 @@ test("video that starts after audio keeps that offset instead of leading the sou
         return [type, Number(value)];
       }),
     );
-    // The half-second lead-in must stay in the video track (held first
-    // frame), so both tracks end together as in the source, apart from the
-    // deliberate capture-latency hold on the picture.
+    // The input's arbitrary half-second origin is removed. Only the explicit
+    // capture-latency picture hold remains, so the muxer can segment live.
     assert.ok(
-      Math.abs(durations.video! - durations.audio! - videoDelay) < 0.15,
+      Math.abs(durations.video! - durations.audio! + 0.5 - videoDelay) < 0.15,
       "video " + durations.video + " vs audio " + durations.audio,
     );
+    assert.equal(COMPANION_AUDIO_FILTER, "asetpts=N/SR/TB");
     assert.ok(videoDelay > 0 && videoDelay < 0.5);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

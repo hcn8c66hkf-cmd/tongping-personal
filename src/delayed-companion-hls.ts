@@ -90,18 +90,18 @@ const COMPANION_AV_VIDEO_DELAY_S = (() => {
 })();
 
 export const COMPANION_VIDEO_FILTER =
-  "setpts='if(eq(N,0),PTS+" + COMPANION_AV_VIDEO_DELAY_S.toFixed(3) +
+  "setpts='if(eq(N,0)," + COMPANION_AV_VIDEO_DELAY_S.toFixed(3) +
   "/TB,PREV_OUTPTS+clip(PTS-PREV_INPTS,1,0.25/TB))'," +
   "scale=w=1280:h=-2:force_original_aspect_ratio=decrease," +
   "pad=ceil(iw/2)*2:ceil(ih/2)*2";
 
-export const COMPANION_AUDIO_FILTER = "asetpts=STARTPTS+N/SR/TB";
+export const COMPANION_AUDIO_FILTER = "asetpts=N/SR/TB";
 
 // The same timestamp rule as COMPANION_VIDEO_FILTER, as a bitstream filter so
 // H.264 from the recorder can be copied instead of re-encoded (about 1/8 of
 // the CPU per viewer). Commas are escaped for the -bsf list parser.
 export const COMPANION_COPY_VIDEO_BSF =
-  "setts=ts=if(eq(N\\,0)\\,PTS+" + COMPANION_AV_VIDEO_DELAY_S.toFixed(3) +
+  "setts=ts=if(eq(N\\,0)\\," + COMPANION_AV_VIDEO_DELAY_S.toFixed(3) +
   "/TB\\,PREV_OUTPTS+clip(PTS-PREV_INPTS\\,1\\,0.25/TB))";
 
 // Copying H.264 from Chrome saves CPU, but some Windows MediaRecorder builds
@@ -326,9 +326,10 @@ export class DelayedCompanionHls {
       // MediaRecorder may also jump its PTS after a tab stalls; each
       // frame step is clamped to 250ms so a jump cannot become minutes of
       // duplicated frames. Audio stays sample-count based (continuous).
-      // Both clocks keep their own first timestamp: the recorder usually
-      // starts audio a few hundred ms before the first video frame, and
-      // zeroing both made the picture lead the sound by that much.
+      // Chrome tab capture sometimes gives audio and video unrelated large
+      // starting PTS values. Keeping those origins can make the HLS muxer
+      // wait forever even while hundreds of frames encode. Normalize both
+      // clocks to zero and apply the measured picture hold explicitly.
       // H.264 recordings keep their frames (copy); segments then cut on the
       // recorder's 2 s key frames.
       ...companionVideoArgs(copyVideo),
