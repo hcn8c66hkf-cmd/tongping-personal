@@ -49,5 +49,5 @@ test("v49 forces a fresh MCP App resource instead of cached v38 UI", () => {
     new URL("../src/browser-app.ts", import.meta.url),
     "utf8",
   );
-  assert.match(app, /shared-browser-v95/);
+  assert.match(app, /shared-browser-v96/);
 });
