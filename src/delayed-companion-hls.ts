@@ -104,12 +104,13 @@ export const COMPANION_COPY_VIDEO_BSF =
   "setts=ts=if(eq(N\\,0)\\,PTS+" + COMPANION_AV_VIDEO_DELAY_S.toFixed(3) +
   "/TB\\,PREV_OUTPTS+clip(PTS-PREV_INPTS\\,1\\,0.25/TB))";
 
-// Only H.264 in WebM/Matroska is copied. Chrome's MP4 recordings of a real
-// tab decode as mosaic in ffmpeg (hardware and software encoder alike), while
-// the same encoder's output in Matroska is clean, so MP4 always re-encodes.
-// TONGPING_COMPANION_VIDEO_COPY_WEBM=0 turns copying off.
+// Copying H.264 from Chrome saves CPU, but some Windows MediaRecorder builds
+// stop emitting usable keyframes after the first cluster. ffmpeg then keeps
+// accepting megabytes while the HLS playlist stays at zero seconds forever.
+// Personal installs therefore re-encode by default for deterministic 2 s GOPs.
+// The old low-CPU path remains an explicit opt-in for proven-good machines.
 export function isCopyableCompanionMime(mimeType: string): boolean {
-  if (process.env.TONGPING_COMPANION_VIDEO_COPY_WEBM === "0") return false;
+  if (process.env.TONGPING_COMPANION_VIDEO_COPY_WEBM !== "1") return false;
   return /^video\/(?:webm|x-matroska);.*\b(?:h264|avc1)/i.test(mimeType);
 }
 

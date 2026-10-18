@@ -27,5 +27,5 @@ test("fresh playback diagnostics use a new app resource identity", () => {
     new URL("../src/browser-app.ts", import.meta.url),
     "utf8",
   );
-  assert.match(app, /shared-browser-v98/);
+  assert.match(app, /shared-browser-v99/);
 });

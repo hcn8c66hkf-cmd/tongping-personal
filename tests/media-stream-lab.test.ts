@@ -159,5 +159,5 @@ test("v50 iOS-like hosts stay on realtime view and media failures never auto-rec
     app,
     /scheduleMediaReconnect\(\)[\s\S]{0,220}setTimeout\([^\n]*ensureMediaSocket/,
   );
-  assert.match(app, /shared-browser-v98/);
+  assert.match(app, /shared-browser-v99/);
 });

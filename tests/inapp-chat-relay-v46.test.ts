@@ -71,7 +71,7 @@ test("browser app renders both roles and requests exact reply mirroring", () => 
   assert.match(app, /同屏群聊；identity=/);
   assert.doesNotMatch(app, /IN-APP CHAT RELAY/);
   assert.doesNotMatch(app, /同屏 context: identity=/);
-  assert.match(app, /shared-browser-v98/);
+  assert.match(app, /shared-browser-v99/);
   assert.doesNotMatch(app, /id="lastAsk"/);
 });
 

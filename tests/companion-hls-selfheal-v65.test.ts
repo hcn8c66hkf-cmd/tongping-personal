@@ -26,7 +26,7 @@ test("daemon restarts companion capture when a finished clip is replayed", () =>
 });
 
 test("App v65 keeps probing HLS truth after playback starts", () => {
-  assert.ok(app.includes("shared-browser-v98"));
+  assert.ok(app.includes("shared-browser-v99"));
   assert.ok(app.includes("scheduleCompanionProbe(companionVideoStarted ? 1500 : 900)"));
   assert.ok(app.includes("scheduleCompanionProbe(companionVideoStarted ? 1500 : 1200)"));
 });

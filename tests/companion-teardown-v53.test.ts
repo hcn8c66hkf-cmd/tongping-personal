@@ -39,5 +39,5 @@ test("companion close uses a reconnect grace before worker capture teardown", ()
 });
 
 test("teardown ships under a fresh App resource identity", () => {
-  assert.ok(app.includes("shared-browser-v98"));
+  assert.ok(app.includes("shared-browser-v99"));
 });
