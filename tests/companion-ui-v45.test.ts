@@ -59,5 +59,5 @@ test("cute preparing animation is CSS-only and resource identity is fresh", () =
   assert.ok(app.includes('@keyframes companionBounce'));
   assert.ok(app.includes('class="companionTv"'));
   assert.ok(app.includes('class="companionDot"'));
-  assert.ok(app.includes('shared-browser-v95'));
+  assert.ok(app.includes('shared-browser-v96'));
 });
