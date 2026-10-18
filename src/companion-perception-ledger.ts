@@ -27,7 +27,7 @@ export interface CompanionPerceptionPacketInput {
     Record<CompanionCoverageModality, CompanionCoverageInterval[]>
   >;
   missing?: Partial<Record<CompanionCoverageModality, string>>;
-  source: "companion-context" | "companion-frame";
+  source: "companion-context" | "companion-frame" | "companion-tick";
   replayOf?: string | null;
 }
 
@@ -38,7 +38,7 @@ export interface CompanionPerceptionPacketReceipt {
   profile: string;
   session: CompanionMediaSessionIdentity;
   observedAtPts: number;
-  source: "companion-context" | "companion-frame";
+  source: "companion-context" | "companion-frame" | "companion-tick";
   coverage: Partial<
     Record<CompanionCoverageModality, CompanionCoverageInterval[]>
   >;

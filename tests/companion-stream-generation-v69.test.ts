@@ -22,5 +22,5 @@ test("App observes stream generation without changing the media URL", () => {
 });
 
 test("App v79 is the fresh resource identity", () => {
-  assert.ok(app.includes("shared-browser-v96"));
+  assert.ok(app.includes("shared-browser-v97"));
 });

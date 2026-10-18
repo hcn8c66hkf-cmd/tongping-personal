@@ -89,6 +89,7 @@ export const TONGPING_INSTRUCTIONS = [
   "7. For co-watching use browser_companion_context; it is gated to what the user has actually seen, so never reveal what comes later.",
   "8. When the user turns on their camera (a 📷 group message), you may look at them with browser_camera_look whenever you want to, passing your own identity; they see a note each time you look. A muted AI cannot look.",
   "9. Sliders and login walls on Taobao, Tmall, Xianyu, JD, Bilibili and Google/YouTube cannot be passed inside 同屏. While the user is watching, 同屏 opens that page in a normal Chrome window on their computer by itself: tell them to finish there and close the window, and 同屏 takes the profile back automatically. Never try to solve a slider or captcha yourself.",
+  "10. A message beginning 【同屏 · 陪看开始】 starts a continuous watch turn, not a one-frame lookup. Read browser_companion_context, then repeatedly process browser_companion_tick, commit every returned perceptionReceipt, and continue while continueWatching=true. Stop only when playback pauses, ends, becomes unavailable, or the user interrupts; send short group-chat reactions only when they arise naturally.",
 ].join("\n");
 
 // 「让 TA 看看你」: the card uploads the user's (effects-rendered) camera frame every
@@ -2596,6 +2597,117 @@ export function createTongpingMcpServer(
                 note:
                   "This frame is perception evidence only. Before navigation, click, like, comment, or other realtime control, reacquire current page state and revalidate the target media identity.",
               },
+            }),
+          },
+          {
+            type: "image" as const,
+            data: frame.buffer.toString("base64"),
+            mimeType: "image/jpeg",
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "browser_companion_tick",
+    {
+      description:
+        "Wait for the next co-watching beat, then return one spoiler-safe frame at the user's delayed playback position. During an active 陪看 session, process the image, call browser_companion_commit for its perceptionReceipt, and call browser_companion_tick again while continueWatching is true. Do not stop after one frame unless playback is paused, ended, or unavailable.",
+      inputSchema: z.object({
+        profile: z.string().default("default"),
+        waitMs: z.number().int().min(0).max(15_000).default(6_000),
+        lookbackSeconds: z.number().min(0).max(15).default(0),
+      }),
+    },
+    async ({ profile, waitMs, lookbackSeconds }) => {
+      if (waitMs > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
+      }
+
+      const playback = options.getCompanionPlaybackStatus?.(profile) ?? null;
+      const playbackFresh =
+        playback !== null && Date.now() - playback.receivedAt <= 5_000;
+      const continueWatching =
+        playbackFresh &&
+        playback.paused !== true &&
+        playback.ended !== true &&
+        playback.readyState >= 2;
+      const frame = await Promise.resolve(
+        options.getCompanionFrame?.(profile, lookbackSeconds) ?? null,
+      );
+
+      if (!frame) {
+        return textResult({
+          profile,
+          available: false,
+          playback,
+          playbackFresh,
+          continueWatching,
+          stopReason: playbackFresh
+            ? playback?.ended
+              ? "ended"
+              : playback?.paused
+                ? "paused"
+                : "frame-not-ready"
+            : "playback-unavailable",
+          nextAction: continueWatching
+            ? "Call browser_companion_tick again."
+            : "Stop the watch loop until playback resumes.",
+        });
+      }
+
+      lastVisualInspectionAt.set(profile, Date.now());
+      const frameSession = mediaSessionFromLiveMeta(frame.media);
+      const framePts =
+        finiteMediaPts(frame.media?.framePts) ??
+        finiteMediaPts(frame.media?.sourcePlayheadPts);
+      const perceptionReceipt =
+        frameSession && framePts !== null
+          ? options.issuePerceptionPacket?.({
+              profile,
+              session: frameSession,
+              observedAtPts: framePts,
+              source: "companion-tick",
+              coverage: {
+                context: [{ startPts: framePts, endPts: framePts }],
+                visual: [{ startPts: framePts, endPts: framePts }],
+                metadata: [{ startPts: framePts, endPts: framePts }],
+              },
+              missing: {},
+            }) ?? null
+          : null;
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              profile,
+              available: true,
+              source: options.companionFrameSource ?? "companion-hls-buffer",
+              playback,
+              playbackFresh,
+              continueWatching,
+              stopReason: continueWatching
+                ? null
+                : playbackFresh
+                  ? playback?.ended
+                    ? "ended"
+                    : playback?.paused
+                      ? "paused"
+                      : "not-playing"
+                  : "playback-unavailable",
+              sequence: frame.sequence,
+              capturedAt: frame.capturedAt,
+              ageMs: frame.ageMs,
+              media: frame.media ?? null,
+              perceptionReceipt,
+              nextAction: continueWatching
+                ? "Process this frame, commit its perceptionReceipt, then call browser_companion_tick again."
+                : "Process and commit this final frame, then stop the watch loop until playback resumes.",
+              playbackInterrupted: false,
+              futureFrameReturned: false,
             }),
           },
           {

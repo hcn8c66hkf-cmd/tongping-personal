@@ -75,5 +75,5 @@ test("MCP state carries current UI and worker builds", () => {
 
 test("v54 cached cards are compatible after the v60 resource bump", () => {
   assert.ok(mcp.includes('"ui://tongping/shared-browser-v54"'));
-  assert.ok(app.includes('shared-browser-v96'));
+  assert.ok(app.includes('shared-browser-v97'));
 });

@@ -31,6 +31,6 @@ test("expected media websocket gap during restart cannot recursively start a sec
 });
 
 test("v60 is current and cached v59 cards resolve to current renderer", () => {
-  assert.ok(app.includes("shared-browser-v96"));
+  assert.ok(app.includes("shared-browser-v97"));
   assert.ok(mcp.includes('"ui://tongping/shared-browser-v58"'));
 });

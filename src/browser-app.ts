@@ -1,4 +1,4 @@
-export const BROWSER_APP_URI = "ui://tongping/shared-browser-v96";
+export const BROWSER_APP_URI = "ui://tongping/shared-browser-v97";
 
 // ngrok's free browser interstitial can replace a same-origin module request
 // with HTML. The card shell then renders, but none of its controls can start.
@@ -1642,6 +1642,7 @@ let companionLastProgressAt = 0;
 let companionLastRecoveryLoadAt = 0;
 let companionLastUserMediaInteractionAt = 0;
 let companionAutoResumeTimer = null;
+let companionAiWatchRequested = false;
 // Set only by the viewer's own pause button. While true nothing may auto-play
 // the companion video, and the PC source + recorder are held as well.
 let companionUserPaused = false;
@@ -3424,6 +3425,7 @@ function stopCompanionPlayback(returnToLive = true) {
   companionLastProgressAt = 0;
   companionLastRecoveryLoadAt = 0;
   companionLastUserMediaInteractionAt = 0;
+  companionAiWatchRequested = false;
   if (companionAutoResumeTimer) {
     clearTimeout(companionAutoResumeTimer);
     companionAutoResumeTimer = null;
@@ -3462,6 +3464,43 @@ function stopCompanionPlayback(returnToLive = true) {
     refreshImage();
   }
   render();
+}
+
+async function startAiCompanionWatch() {
+  if (
+    companionAiWatchRequested ||
+    !companionModeActive ||
+    !companionVideoStarted ||
+    chatMuted.has(normalizeIdentity(state.identity))
+  ) {
+    return;
+  }
+  companionAiWatchRequested = true;
+  try {
+    await app.updateModelContext({
+      content: [{
+        type: "text",
+        text:
+          "同屏陪看正在播放；identity=" + state.identity +
+          "；profile=" + state.profile +
+          "。这是持续陪看，不是单帧查看。先调用 browser_companion_context，再调用 browser_companion_tick；处理并 commit 每个 perceptionReceipt，随后在 continueWatching=true 时继续调用 tick，直到暂停、结束或不可用。只在确实有自然反应时用 browser_app_chat_push 发进群聊，不要逐帧复述。"
+      }]
+    });
+    const result = await app.sendMessage({
+      role: "user",
+      content: [{
+        type: "text",
+        text:
+          "【同屏 · 陪看开始】视频已经开始播放。请进入持续陪看：先读取 browser_companion_context，再每隔几秒调用 browser_companion_tick；看完并提交每一帧后继续下一次，直到视频暂停或结束。不要只看一帧就退出。"
+      }]
+    });
+    if (result && result.isError) {
+      throw new Error("宿主拒绝开始持续陪看");
+    }
+  } catch (error) {
+    companionAiWatchRequested = false;
+    setError(error && error.message ? error.message : error);
+  }
 }
 
 function sendCompanionPause() {
@@ -3542,6 +3581,7 @@ async function toggleCompanionMode() {
   companionStreamId = "";
   companionSourceSamples = [];
   companionLastUserMediaInteractionAt = 0;
+  companionAiWatchRequested = false;
   if (companionAutoResumeTimer) {
     clearTimeout(companionAutoResumeTimer);
     companionAutoResumeTimer = null;
@@ -6824,6 +6864,7 @@ function noteCompanionPlaybackProgress() {
   ) {
     companionLastProgressTime = current;
     companionLastProgressAt = now;
+    void startAiCompanionWatch();
   }
 
   if (
