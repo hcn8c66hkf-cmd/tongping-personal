@@ -17,6 +17,6 @@ test("signed media URL rotation does not tear down a healthy socket", () => {
 });
 
 test("App build/resource is v62 for stable signed media authority", () => {
-  assert.ok(app.includes("shared-browser-v94"));
+  assert.ok(app.includes("shared-browser-v95"));
   assert.ok(app.includes('appUiBuild: "v93"'));
 });
