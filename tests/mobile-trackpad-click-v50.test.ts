@@ -40,5 +40,5 @@ test("double and right click still preserve ordered pointer down/up", () => {
   assert.ok(body.includes("setTimeout(resolve, 36)"));
   assert.ok(body.includes('const up = postPointer("up"'));
   assert.ok(body.includes('await Promise.all([down, up])'));
-  assert.ok(app.includes("shared-browser-v94"));
+  assert.ok(app.includes("shared-browser-v95"));
 });
