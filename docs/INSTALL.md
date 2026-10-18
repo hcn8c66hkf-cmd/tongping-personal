@@ -188,14 +188,36 @@ claude.ai 和 ChatGPT 的服务器在云上，它们访问不到你电脑的 `12
 
 缺点：**每次重启 cloudflared 地址都会变**，变了就要改 `.env`、重启同屏、并在 Claude/ChatGPT 里删掉旧连接器重新添加。
 
-### 方案 B：固定地址（长期使用推荐）
+### 方案 B：ngrok 固定地址 + 一键启动（长期使用推荐）
 
-- **Cloudflare 命名隧道**：需要一个托管在 Cloudflare 的域名。按官方文档创建 tunnel，把一个子域名（如 `tongping.你的域名.com`）指向 `http://127.0.0.1:45921`。
-- **Tailscale Funnel**：免费，地址固定为 `https://电脑名.xxx.ts.net`。安装 Tailscale 并登录后运行 `tailscale funnel 45921`（具体以 Tailscale 官方文档为准）。
+ngrok 免费账号会分配一个绑定账号的固定开发域名。电脑重启、隧道重连后仍使用同一个地址。
 
-拿到固定的 `https://` 地址后，同样填进 `TONGPING_PUBLIC_ORIGIN`，重启同屏，用 `npm run doctor` 确认。
+1. 安装 ngrok（Windows 可运行 `winget install ngrok.ngrok`，也可以从 <https://ngrok.com/download> 下载）。
+2. 登录 ngrok Dashboard，复制自己的 auth token，只在本机终端运行一次：
+   ```bash
+   ngrok config add-authtoken 你的令牌
+   ```
+   不要把令牌发给别人或粘贴进 `.env`。
+3. Windows 双击 **`启动同屏和固定隧道.cmd`**；也可以在项目目录运行：
+   ```bash
+   npm run up:ngrok
+   ```
+4. 启动器会自动：
+   - 拉起 ngrok；
+   - 读取账号固定的 `https://xxxx.ngrok-free.app`；
+   - 只更新 `.env` 里的 `TONGPING_PUBLIC_ORIGIN`；
+   - 启动同屏；
+   - 在窗口里打印最终的 `/mcp` 地址。
+5. 首次把这个固定 `/mcp` 地址接入 Claude / ChatGPT。以后只双击同一个文件，不需要再改 `.env` 或连接器。
 
-> 不推荐 ngrok 免费版：它会给浏览器请求插一个警告页，导致卡片画面加载失败。
+关闭时在这个窗口按一次 `Ctrl+C`，同屏和 ngrok 会一起停止。
+
+> ngrok 免费版会在直接访问 HTML 页面时显示一次安全提示页；点「Visit」后该域名 7 天内不再提示。API/程序化请求不受这个提示页影响。
+
+其他固定方案：
+
+- **Cloudflare 命名隧道**：需要一个托管在 Cloudflare 的域名。
+- **Tailscale Funnel**：地址固定为 `https://电脑名.xxx.ts.net`。
 
 ## 7. 接入 AI
 
@@ -210,6 +232,6 @@ claude.ai 和 ChatGPT 的服务器在云上，它们访问不到你电脑的 `12
 | 同屏文件夹本身 | 代码、`node_modules`、`.env` |
 | `TONGPING_HOME`（默认 `~/.tongping`，Windows 即 `C:\Users\你的用户名\.tongping`） | `daemon/`：令牌、OAuth 记录、陪看缓冲；`worker/`：浏览器 profile（**登录态和 cookie**） |
 | Playwright Chromium（只有执行了 `npx playwright install` 才有） | Windows `%LOCALAPPDATA%\ms-playwright`，macOS `~/Library/Caches/ms-playwright`，Linux `~/.cache/ms-playwright` |
-| 你自己装的 Node.js / ffmpeg / cloudflared | 按各自方式卸载 |
+| 你自己装的 Node.js / ffmpeg / cloudflared / ngrok | 按各自方式卸载 |
 
 卸载步骤见 [UNINSTALL.md](UNINSTALL.md)。

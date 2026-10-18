@@ -7,7 +7,7 @@
 - 在 `npm run up`（或 `启动同屏.cmd`）的窗口按 `Ctrl+C`，或直接关掉窗口。
 - 确认停干净：浏览器打开 `http://127.0.0.1:45921/health`，应该**打不开**。
   - 还能打开：Windows 打开任务管理器 →「详细信息」，结束命令行里含 `tongping` 的 `node.exe`；macOS/Linux 运行 `pkill -f tongping`。
-- 同时关掉 cloudflared 等隧道窗口。
+- 同时关掉 cloudflared、ngrok 等隧道窗口。
 
 ## 2. 断开 AI 的连接
 
@@ -65,7 +65,7 @@ rm -rf ~/.tongping
 
 ## 7.（可选）卸载为同屏安装的软件
 
-Node.js、ffmpeg、cloudflared 如果只为同屏而装，可以按各自的方式卸载（Windows「设置 → 应用」；`winget uninstall Gyan.FFmpeg`；`brew uninstall ffmpeg cloudflared` 等）。别的软件也可能依赖 Node.js，不确定就留着。
+Node.js、ffmpeg、cloudflared、ngrok 如果只为同屏而装，可以按各自的方式卸载（Windows「设置 → 应用」；`winget uninstall Gyan.FFmpeg`；`brew uninstall ffmpeg cloudflared ngrok` 等）。别的软件也可能依赖 Node.js，不确定就留着。
 
 ## 确认卸载干净
 

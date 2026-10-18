@@ -251,7 +251,7 @@ claude.ai / ChatGPT ──HTTPS 隧道──► daemon :45921 ◄── 本机 C
 #### T3 临时隧道地址变了
 - `trycloudflare.com` 的地址每次启动 cloudflared 都会变。
 - 处理：更新 `.env` 的 `TONGPING_PUBLIC_ORIGIN` → 重启同屏 → **在 Claude 和 ChatGPT 里都删掉旧连接器，用新地址重新添加并重新输入密码**。
-- 长期使用请换固定地址（[INSTALL.md 方案 B](INSTALL.md#方案-b固定地址长期使用推荐)）。
+- 长期使用可改用 `启动同屏和固定隧道.cmd`。它会用 ngrok 账号绑定的固定开发域名，并自动更新 `.env`（[INSTALL.md 方案 B](INSTALL.md#方案-bngrok-固定地址--一键启动长期使用推荐)）。
 
 ### O OAuth 授权
 

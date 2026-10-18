@@ -1,4 +1,4 @@
-export const BROWSER_APP_URI = "ui://tongping/shared-browser-v93";
+export const BROWSER_APP_URI = "ui://tongping/shared-browser-v94";
 
 export function browserAppPublicOrigin(): string {
   const value =
@@ -4975,32 +4975,6 @@ async function key(name) {
     setError(error && error.message ? error.message : error);
   }
 }
-// Messages from the user and the other AIs since this card's AI last spoke, so
-// its reply fits the group conversation.
-function groupChatDigest() {
-  const me = normalizeIdentity(state.identity);
-  let start = 0;
-  for (let i = chatMessages.length - 1; i >= 0; i -= 1) {
-    const item = chatMessages[i];
-    if (item.role === "assistant" && item.identity === me) {
-      start = i + 1;
-      break;
-    }
-  }
-  const others = chatMessages
-    .slice(start)
-    .filter((item) => item.role === "assistant" && item.identity !== me)
-    .slice(-12);
-  if (others.length === 0) return "";
-  return (
-    " GROUP CHAT: this panel is a group chat " + userAiName() + " shares with other AIs. Since your last reply there, they said: " +
-    others
-      .map((item) => chatDisplayName("assistant", item.identity) + ": " + item.text.slice(0, 400))
-      .join(" | ") +
-    ". Reply as yourself only; never speak for them."
-  );
-}
-
 function renderChatMembers() {
   const box = $("chatMembers");
   if (!box) return;
@@ -5116,19 +5090,18 @@ async function setChatMuted(who, muted) {
 
 function chatRelayInstruction() {
   return (
-    ". LOOK FIRST: if " + userAiName() + "'s message is about what is on screen, call browser_screenshot (or browser_look when they pressed 「叫大家看」) yourself before replying." +
-    " [REQUIRED, do not skip] IN-APP CHAT RELAY: this user message originated inside the embedded 同屏 group chat panel, and " + userAiName() + " reads your answer THERE. FIRST ACTION of your reply, before writing any text: call the MCP tool browser_app_chat_push exactly once with your reply, identity=" +
+    "。回复正文前先调用 browser_app_chat_push（identity=" +
     state.identity +
-    ", profile=" +
+    "，profile=" +
     state.profile +
-    ", and text equal to the reply you are about to give. Only after that tool call succeeds, write the same reply in the host chat. A reply that is not pushed never reaches the panel." +
+    "，text=你的完整回复），再在主聊天发送相同回复；涉及屏幕时先用 browser_screenshot，用户点了「叫大家看」时先用 browser_look" +
     // The old browser_read relay exists only on the personal server.
     (state.userName
-      ? " If browser_app_chat_push is not available in your current tool catalog, use the existing browser_read tool as a compatibility relay instead: profile=" +
+      ? "。若没有 browser_app_chat_push，则用 browser_read 兼容接力：profile=" +
         state.profile +
-        ", selector=\\"__tongping_chat_push__::" +
+        "，selector=\\"__tongping_chat_push__::" +
         state.identity +
-        "::\\" followed immediately by the SAME final reply text, format=\\"text\\", maxChars=1000. Do not perform a real page read in that compatibility call. Do not use either relay for unrelated host-chat messages."
+        "::\\"紧接完整回复，format=\\"text\\"，maxChars=1000"
       : "")
   );
 }
@@ -6264,15 +6237,13 @@ async function showCurrentFrameToAi() {
         {
           type: "text",
           text:
-            "同屏 context: identity=" +
+            "同屏群聊；identity=" +
             state.identity +
-            ", profile=" +
+            "；profile=" +
             state.profile +
-            ", url=" +
-            (state.url || "(none)") +
-            ". USER_EXPLICIT_VISUAL_CHECK: " + userAiName() + " pressed 「叫大家看」. The exact frame they are pointing at is NOT attached here; call the 同屏 tool browser_look with profile=" +
+            "。用户点了「叫大家看」；先调用 browser_look（profile=" +
             state.profile +
-            " to see it, then respond naturally to what they are pointing out. Do not answer before looking." +
+            "）看共享画面" +
             chatRelayInstruction()
         }
       ]
@@ -6468,8 +6439,8 @@ async function openCamera() {
         content: [{
           type: "text",
           text:
-            "同屏 context: " + userAiName() + " turned on their camera (「让 TA 看看你」). Whenever you want to see them, call browser_camera_look with identity=" +
-            state.identity + "; they see a note each time you look."
+            "同屏：用户已打开摄像头；想看时调用 browser_camera_look（identity=" +
+            state.identity + "），每次查看都会留下一条提示"
         }]
       }).catch(() => {});
     }
@@ -6761,16 +6732,14 @@ async function sendToAi() {
       content: [{
         type: "text",
         text:
-          "同屏 context: identity=" +
+          "同屏群聊；identity=" +
           state.identity +
-          ", profile=" +
+          "；profile=" +
           state.profile +
-          ", url=" +
-          (state.url || "(none)") +
-          ", control=" +
-          (state.takeover ? "human" : "model") +
-          chatRelayInstruction() +
-          groupChatDigest()
+          "；如需其他成员的上下文，先调用 browser_app_room_read（identity=" +
+          state.identity +
+          "）" +
+          chatRelayInstruction()
       }]
     });
 

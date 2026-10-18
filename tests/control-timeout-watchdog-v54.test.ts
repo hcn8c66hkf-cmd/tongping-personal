@@ -31,5 +31,5 @@ test("pointer timeout covers the daemon's eight-second worker command envelope",
   const end = app.indexOf("async function clickRemote", start);
   const body = app.slice(start, end);
   assert.ok(body.includes("}, 9000);"));
-  assert.ok(app.includes("shared-browser-v93"));
+  assert.ok(app.includes("shared-browser-v94"));
 });

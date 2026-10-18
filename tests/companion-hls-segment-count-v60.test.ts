@@ -12,6 +12,6 @@ test("HLS probe counts segment URI lines across newlines", () => {
 });
 
 test("app v60 keeps cached v59 cards compatible", () => {
-  assert.ok(app.includes("shared-browser-v93"));
+  assert.ok(app.includes("shared-browser-v94"));
   assert.ok(mcp.includes("shared-browser-v59"));
 });

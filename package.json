@@ -9,6 +9,7 @@
   },
   "scripts": {
     "up": "node scripts/start.mjs",
+    "up:ngrok": "node scripts/start-ngrok.mjs",
     "selftest": "node scripts/selftest.mjs",
     "start": "tsx src/index.ts",
     "mcp": "tsx src/index.ts",

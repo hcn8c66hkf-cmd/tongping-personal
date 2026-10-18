@@ -67,9 +67,11 @@ test("browser app renders both roles and requests exact reply mirroring", () => 
   assert.match(app, /chatRow.assistant/);
   assert.match(app, /white-space:pre-wrap/);
   assert.match(app, /正在回复/);
-  assert.match(app, /browser_app_chat_push exactly once/);
-  assert.match(app, /FIRST ACTION of your reply, before writing any text/);
-  assert.match(app, /shared-browser-v93/);
+  assert.match(app, /回复正文前先调用 browser_app_chat_push/);
+  assert.match(app, /同屏群聊；identity=/);
+  assert.doesNotMatch(app, /IN-APP CHAT RELAY/);
+  assert.doesNotMatch(app, /同屏 context: identity=/);
+  assert.match(app, /shared-browser-v94/);
   assert.doesNotMatch(app, /id="lastAsk"/);
 });
 
@@ -94,6 +96,6 @@ test("cached connector catalogs can relay through browser_read without touching 
   );
   assert.match(server, /__tongping_chat_push__::/);
   assert.match(server, /compatibilityRelay: "browser_read"/);
-  assert.match(app, /If browser_app_chat_push is not available/);
+  assert.match(app, /若没有 browser_app_chat_push/);
   assert.ok(app.includes("__tongping_chat_push__::"));
 });

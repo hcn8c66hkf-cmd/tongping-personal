@@ -30,5 +30,5 @@ test("automatic retry preserves diagnostics without asking for another tap", () 
 });
 
 test("App v89 is the fresh resource identity", () => {
-  assert.ok(app.includes("shared-browser-v93"));
+  assert.ok(app.includes("shared-browser-v94"));
 });

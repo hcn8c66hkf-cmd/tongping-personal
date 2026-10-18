@@ -35,5 +35,5 @@ test("stop and fresh companion entry clear pending auto-resume state", () => {
 });
 
 test("App v79 is the fresh resource identity", () => {
-  assert.ok(app.includes("shared-browser-v93"));
+  assert.ok(app.includes("shared-browser-v94"));
 });

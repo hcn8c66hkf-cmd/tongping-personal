@@ -19,7 +19,7 @@ test("daemon restarts the whole companion recorder when ffmpeg exits unexpectedl
 });
 
 test("App v65 keeps probing HLS truth after playback starts", () => {
-  assert.ok(app.includes("shared-browser-v93"));
+  assert.ok(app.includes("shared-browser-v94"));
   assert.ok(app.includes("scheduleCompanionProbe(companionVideoStarted ? 1500 : 900)"));
   assert.ok(app.includes("scheduleCompanionProbe(companionVideoStarted ? 1500 : 1200)"));
 });
