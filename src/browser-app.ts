@@ -1,6 +1,6 @@
-export const BROWSER_APP_URI = "ui://tongping/shared-browser-v95";
+export const BROWSER_APP_URI = "ui://tongping/shared-browser-v96";
 
-// ngrok\'s free browser interstitial can replace a same-origin module request
+// ngrok's free browser interstitial can replace a same-origin module request
 // with HTML. The card shell then renders, but none of its controls can start.
 // Load the public, version-pinned MCP Apps bridge from an already allowlisted
 // static origin so the card can bootstrap reliably through free tunnels.
@@ -5080,19 +5080,53 @@ async function onChatClearClick() {
 }
 
 async function setChatMuted(who, muted) {
-  const url = chatEndpoint();
-  if (!url) return;
+  who = normalizeIdentity(who);
+  const wasMuted = chatMuted.has(who);
   if (muted) chatMuted.add(who);
   else chatMuted.delete(who);
   renderChatMembers();
-  try {
-    await fetch(url, {
-      method: "POST",
-      cache: "no-store",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "mute", identity: who, muted })
-    });
-  } catch {}
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const url = chatEndpoint();
+      if (!url) throw new Error("chat unavailable");
+      const response = await fetch(url, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "mute", identity: who, muted })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !Array.isArray(data.muted)) {
+        // A long-open card may hold an expired signed chat URL. Refresh all
+        // signed lanes once, then retry the exact user choice.
+        if (response.status === 403 && attempt === 0) {
+          await refreshFrame();
+          continue;
+        }
+        throw new Error("mute sync failed");
+      }
+
+      chatMuted.clear();
+      for (const identity of data.muted) {
+        chatMuted.add(normalizeIdentity(identity));
+      }
+      renderChatMembers();
+      setError("");
+      return;
+    } catch {
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+        continue;
+      }
+    }
+  }
+
+  // Never leave an optimistic bell state that disagrees with the server.
+  if (wasMuted) chatMuted.add(who);
+  else chatMuted.delete(who);
+  renderChatMembers();
+  setError("禁言设置没同步，请再点一次");
 }
 
 function chatRelayInstruction() {
