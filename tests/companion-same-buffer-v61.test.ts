@@ -13,7 +13,7 @@ test("App reports the actual buffered HLS playback clock", () => {
   assert.ok(app.includes("video.currentTime"));
   assert.ok(app.includes("presentationDateMs"));
   assert.ok(app.includes("companionPlaybackStatusTimer = setInterval"));
-  assert.ok(app.includes("shared-browser-v99"));
+  assert.ok(app.includes("shared-browser-v100"));
 });
 
 test("media hub stores profile-scoped companion playback status", () => {

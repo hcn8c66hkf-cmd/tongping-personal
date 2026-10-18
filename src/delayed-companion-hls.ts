@@ -226,6 +226,8 @@ interface Session {
   exitCode: number | null;
   sourceTimeline: CompanionSourceTimelineAnchor | null;
   sourceSamples: CompanionSourceTimelineAnchor[];
+  encodedSeconds: number;
+  lastEncodedAt: number;
   // While the viewer has companion paused the recorder is paused too; no
   // source samples are taken then (the source is held still).
   pausedSince: number | null;
@@ -334,6 +336,8 @@ export class DelayedCompanionHls {
       "-b:a", "128k",
       "-ac", "2",
       "-ar", "48000",
+      "-progress", "pipe:1",
+      "-nostats",
       "-f", "hls",
       "-hls_time", "2",
       "-hls_list_size", "75",
@@ -369,6 +373,8 @@ export class DelayedCompanionHls {
       exitCode: null,
       sourceTimeline,
       sourceSamples: sourceTimeline ? [sourceTimeline] : [],
+      encodedSeconds: 0,
+      lastEncodedAt: 0,
       pausedSince: null,
       quickResume: Date.now() - (this.lastEndedAt.get(profile) ?? 0) < QUICK_RESUME_WINDOW_MS,
     };
@@ -377,6 +383,23 @@ export class DelayedCompanionHls {
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) => {
       session.stderrTail = (session.stderrTail + chunk).slice(-8000);
+    });
+    // Input traffic is not proof of a usable stream: malformed streaming
+    // WebM can keep the pipe busy while producing no HLS output at all.
+    child.stdout.setEncoding("utf8");
+    let progressTail = "";
+    child.stdout.on("data", (chunk: string) => {
+      progressTail += chunk;
+      const lines = progressTail.split(/\r?\n/);
+      progressTail = lines.pop() ?? "";
+      for (const line of lines) {
+        const match = /^out_time_us=(\d+)$/.exec(line);
+        if (!match) continue;
+        const seconds = Number(match[1]) / 1_000_000;
+        if (!Number.isFinite(seconds) || seconds <= session.encodedSeconds) continue;
+        session.encodedSeconds = seconds;
+        session.lastEncodedAt = Date.now();
+      }
     });
     child.on("exit", (code) => {
       session.exited = true;
@@ -1093,6 +1116,11 @@ export class DelayedCompanionHls {
         ageMs: Date.now() - session.startedAt,
         bytesIn: session.bytesIn,
         chunksIn: session.chunksIn,
+        encodedSeconds: session.encodedSeconds,
+        lastEncodedAgeMs:
+          session.lastEncodedAt > 0
+            ? Date.now() - session.lastEncodedAt
+            : null,
         lastChunkAgeMs:
           session.lastChunkAt > 0
             ? Date.now() - session.lastChunkAt

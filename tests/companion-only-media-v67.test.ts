@@ -34,5 +34,5 @@ test("companion_ready remains the single buffered capture authority", () => {
 });
 
 test("App v67 is the fresh resource identity", () => {
-  assert.ok(app.includes("shared-browser-v99"));
+  assert.ok(app.includes("shared-browser-v100"));
 });

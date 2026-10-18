@@ -1300,8 +1300,12 @@ async function ensureMedia(
               ? 64_000
               : 96_000,
             keepSourcePlaying: true,
-            // H.264 in WebM: the server copies it instead of re-encoding.
-            preferH264: true,
+            // Chrome's H.264-in-WebM recorder can keep emitting sizeable
+            // chunks on Windows while ffmpeg never sees a decodable first
+            // frame (the HLS playlist then remains empty forever).  Capture
+            // the broadly interoperable VP8 WebM stream instead; the daemon
+            // already transcodes companion video to H.264 for fMP4 HLS.
+            preferH264: false,
           }
         : {},
     ) as Record<string, unknown>;

@@ -7,11 +7,14 @@ test("live ffmpeg with stalled incoming media is recovered but short gaps are to
   const now = 100_000;
   const base = { exited: false, ageMs: 25_000, chunksIn: 13 };
   assert.equal(companionHlsRecoveryReason({ ...base, lastChunkAgeMs: 12_000 }, now, 0), "stalled");
-  assert.equal(companionHlsRecoveryReason({ ...base, lastChunkAgeMs: 4_000 }, now, 0), null);
+  assert.equal(companionHlsRecoveryReason({ ...base, lastChunkAgeMs: 4_000 }, now, 0), "no-output");
+  assert.equal(companionHlsRecoveryReason({ ...base, lastChunkAgeMs: 4_000, encodedSeconds: 4 }, now, 0), null);
   assert.equal(companionHlsRecoveryReason({ ...base, ageMs: 8_000, lastChunkAgeMs: 12_000 }, now, 0), null);
   assert.equal(companionHlsRecoveryReason({ ...base, chunksIn: 0, lastChunkAgeMs: null }, now, 0), null);
   assert.equal(companionHlsRecoveryReason({ ...base, lastChunkAgeMs: 12_000 }, now, now - 5_000), null);
   assert.equal(companionHlsRecoveryReason({ ...base, exited: true, lastChunkAgeMs: 0 }, now, 0), "exited");
+  assert.equal(companionHlsRecoveryReason({ ...base, ageMs: 21_000, lastChunkAgeMs: 500 }, now, 0), "no-output");
+  assert.equal(companionHlsRecoveryReason({ ...base, ageMs: 21_000, lastChunkAgeMs: 500, encodedSeconds: 4 }, now, 0), null);
 });
 
 

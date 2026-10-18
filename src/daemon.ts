@@ -1243,6 +1243,7 @@ function companionCaptureProducing(profile: string): boolean {
       ageMs: number;
       chunksIn: number;
       lastChunkAgeMs: number | null;
+      encodedSeconds?: number;
     }>;
   };
   return (status.sessions ?? []).some(
@@ -1368,6 +1369,7 @@ const companionHlsWatchdog = setInterval(() => {
       ageMs: number;
       chunksIn: number;
       lastChunkAgeMs: number | null;
+      encodedSeconds?: number;
     }>;
   };
 

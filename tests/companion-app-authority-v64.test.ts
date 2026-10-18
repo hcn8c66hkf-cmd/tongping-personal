@@ -7,7 +7,7 @@ const mcp = fs.readFileSync(new URL("../src/mcp-server.ts", import.meta.url), "u
 const hub = fs.readFileSync(new URL("../src/media-ws-hub.ts", import.meta.url), "utf8");
 
 test("v64 media URL carries an App build generation without changing ticket authority", () => {
-  assert.ok(app.includes("shared-browser-v99"));
+  assert.ok(app.includes("shared-browser-v100"));
   assert.ok(mcp.includes("stampBrowserAppBuildOnMediaUrl"));
   assert.ok(mcp.includes('url.searchParams.set("app_build", build)'));
   assert.ok(mcp.includes("createBrowserMediaUrl("));

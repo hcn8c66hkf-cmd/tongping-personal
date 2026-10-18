@@ -3,6 +3,7 @@ export interface CompanionHlsLiveness {
   ageMs: number;
   chunksIn: number;
   lastChunkAgeMs: number | null;
+  encodedSeconds?: number;
 }
 
 export function companionHlsRecoveryReason(
@@ -10,7 +11,7 @@ export function companionHlsRecoveryReason(
   now: number,
   lastAttemptAt: number,
   stallMs = 10_000,
-): "exited" | "stalled" | null {
+): "exited" | "stalled" | "no-output" | null {
   if (now - lastAttemptAt < 30_000) return null;
   if (session.exited) return "exited";
   if (
@@ -20,6 +21,13 @@ export function companionHlsRecoveryReason(
     session.lastChunkAgeMs >= stallMs
   ) {
     return "stalled";
+  }
+  if (
+    session.ageMs >= 20_000 &&
+    session.chunksIn >= 10 &&
+    (session.encodedSeconds ?? 0) < 0.5
+  ) {
+    return "no-output";
   }
   return null;
 }

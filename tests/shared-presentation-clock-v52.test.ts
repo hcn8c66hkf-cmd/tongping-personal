@@ -37,5 +37,5 @@ test("shared clock ships under a fresh MCP App resource identity", () => {
     new URL("../src/browser-app.ts", import.meta.url),
     "utf8",
   );
-  assert.match(app, /shared-browser-v99/);
+  assert.match(app, /shared-browser-v100/);
 });
