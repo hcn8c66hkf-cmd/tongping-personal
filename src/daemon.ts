@@ -1371,9 +1371,11 @@ const companionHlsWatchdog = setInterval(() => {
     }>;
   };
 
+  const activeSessionProfiles = new Set<string>();
   for (const row of status.sessions ?? []) {
     const profile =
       typeof row.profile === "string" ? row.profile : "";
+    if (profile) activeSessionProfiles.add(profile);
     if (!profile || companionHlsRecoveringProfiles.has(profile) ||
         mediaRestartInFlightProfiles.has(profile) ||
         companionPausedProfiles.has(profile)) continue;
@@ -1402,6 +1404,69 @@ const companionHlsWatchdog = setInterval(() => {
         setTimeout(() => {
           companionHlsRecoveringProfiles.delete(profile);
         }, 3_000).unref?.();
+      });
+  }
+
+  // A finite clip closes its MediaRecorder when it reaches the end. The HLS
+  // session is then deliberately removed, so the liveness loop above has no
+  // row left to inspect. If the user presses replay while the App remains in
+  // companion mode, detect the newly-playing source and create a fresh
+  // recorder generation instead of leaving the viewer on a dead buffer.
+  for (const profile of mediaWsHub.appProfiles()) {
+    if (
+      activeSessionProfiles.has(profile) ||
+      companionHlsRecoveringProfiles.has(profile) ||
+      mediaRestartInFlightProfiles.has(profile) ||
+      companionPausedProfiles.has(profile) ||
+      mediaWsHub.appSubscribers(profile) <= 0 ||
+      !mediaWsHub.appReady(profile) ||
+      mediaWsHub.appMode(profile) !== "companion"
+    ) {
+      continue;
+    }
+
+    const now = Date.now();
+    const lastAttemptAt = companionHlsRecoveryLastAttemptAt.get(profile) ?? 0;
+    if (now - lastAttemptAt < 3_000) continue;
+
+    companionHlsRecoveryLastAttemptAt.set(profile, now);
+    companionHlsRecoveringProfiles.add(profile);
+    void browserGateway
+      .call(
+        "browser_media_context",
+        { profile, lookbackSeconds: 0, maxCues: 1 },
+        "companion-replay-recovery",
+      )
+      .then((mediaReply) => {
+        const result =
+          mediaReply?.ok &&
+          mediaReply.result &&
+          typeof mediaReply.result === "object" &&
+          !Array.isArray(mediaReply.result)
+            ? mediaReply.result as Record<string, any>
+            : null;
+        const media =
+          result?.media && typeof result.media === "object"
+            ? result.media as Record<string, any>
+            : null;
+        if (
+          !media ||
+          media.paused !== false ||
+          media.ended === true ||
+          Number(media.readyState ?? 0) < 2
+        ) {
+          return;
+        }
+
+        mediaPrimedProfiles.delete(profile);
+        companionMediaProfiles.add(profile);
+        primeCompanionMediaProfile(profile, true);
+      })
+      .catch(() => {})
+      .finally(() => {
+        setTimeout(() => {
+          companionHlsRecoveringProfiles.delete(profile);
+        }, 1_500).unref?.();
       });
   }
 }, 1_000);
