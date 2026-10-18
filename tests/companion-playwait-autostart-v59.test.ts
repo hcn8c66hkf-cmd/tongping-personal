@@ -27,6 +27,6 @@ test("20/20 UI distinguishes full buffer from first playable HLS startup", () =>
 });
 
 test("app v60 keeps cached v59 cards compatible", () => {
-  assert.ok(app.includes("shared-browser-v95"));
+  assert.ok(app.includes("shared-browser-v96"));
   assert.ok(mcp.includes("shared-browser-v59"));
 });
