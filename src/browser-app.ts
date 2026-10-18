@@ -1,4 +1,11 @@
-export const BROWSER_APP_URI = "ui://tongping/shared-browser-v94";
+export const BROWSER_APP_URI = "ui://tongping/shared-browser-v95";
+
+// ngrok\'s free browser interstitial can replace a same-origin module request
+// with HTML. The card shell then renders, but none of its controls can start.
+// Load the public, version-pinned MCP Apps bridge from an already allowlisted
+// static origin so the card can bootstrap reliably through free tunnels.
+const MCP_APP_BRIDGE_URL =
+  "https://cdn.jsdelivr.net/npm/@modelcontextprotocol/ext-apps@2.0.3/dist/src/app-with-deps.js";
 
 export function browserAppPublicOrigin(): string {
   const value =
@@ -14,7 +21,7 @@ export function browserAppUiDomain(): string | undefined {
 
 export function renderBrowserApp(publicOrigin: string): string {
   const baseOrigin = publicOrigin.replace(/\/+$/, "");
-  const assetUrl = `${baseOrigin}/assets/mcp-app-v2.js`;
+  const assetUrl = MCP_APP_BRIDGE_URL;
   const brandIconUrl = `${baseOrigin}/assets/tongping-icon.png`;
 
   return `<!doctype html>
