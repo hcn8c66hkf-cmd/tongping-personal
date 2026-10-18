@@ -18,8 +18,15 @@ test("daemon restarts the whole companion recorder when ffmpeg exits unexpectedl
   assert.ok(daemon.includes("companionHlsRecoveringProfiles"));
 });
 
+test("daemon restarts companion capture when a finished clip is replayed", () => {
+  assert.ok(daemon.includes("activeSessionProfiles"));
+  assert.ok(daemon.includes('"companion-replay-recovery"'));
+  assert.ok(daemon.includes("media.paused !== false"));
+  assert.ok(daemon.includes("media.ended === true"));
+});
+
 test("App v65 keeps probing HLS truth after playback starts", () => {
-  assert.ok(app.includes("shared-browser-v95"));
+  assert.ok(app.includes("shared-browser-v96"));
   assert.ok(app.includes("scheduleCompanionProbe(companionVideoStarted ? 1500 : 900)"));
   assert.ok(app.includes("scheduleCompanionProbe(companionVideoStarted ? 1500 : 1200)"));
 });
