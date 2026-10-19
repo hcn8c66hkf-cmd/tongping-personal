@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-export const BROWSER_APP_URI = "ui://tongping/shared-browser-v104";
+export const BROWSER_APP_URI = "ui://tongping/shared-browser-v105";
 
 // Keep the MCP Apps bridge inside the component HTML. A second module request
 // could be blocked or time out in the ChatGPT iOS component sandbox, leaving
@@ -35,6 +35,10 @@ function inlineMcpAppBridge(): string {
 }
 
 const MCP_APP_BRIDGE_SOURCE = inlineMcpAppBridge();
+const HLS_PLAYER_SOURCE = readFileSync(
+  fileURLToPath(new URL("../node_modules/hls.js/dist/hls.light.min.js", import.meta.url)),
+  "utf8",
+).replace(/<\/script/gi, "<\\/script");
 
 export function browserAppPublicOrigin(): string {
   const value =
@@ -1561,6 +1565,7 @@ button.on{background:var(--accent-soft);border-color:var(--border);color:var(--a
   </div>
 </div>
 <script type="module">
+${HLS_PLAYER_SOURCE}
 ${MCP_APP_BRIDGE_SOURCE}
 
 const $ = (id) => document.getElementById(id);
@@ -1645,6 +1650,7 @@ let mediaRetryCount = 0;
 let mediaSessionBlocked = false;
 let mediaModeActive = false;
 let companionModeActive = false;
+let companionHlsPlayer = null;
 let companionPhase = "idle";
 let companionDelaySeconds = 20;
 let companionStartedAt = 0;
@@ -3086,6 +3092,7 @@ async function seekCompanionToSource(targetPts) {
   companionBufferStartPts = null;
   companionBufferEndPts = null;
   try { video.pause(); } catch {}
+  destroyCompanionHlsPlayer();
   video.removeAttribute("src");
   try { video.load(); } catch {}
   video.style.display = "none";
@@ -3113,9 +3120,8 @@ async function seekCompanionToSource(targetPts) {
     video.playsInline = true;
     video.muted = false;
     video.classList.add("companionPlayback");
-    video.src = companionPlaybackWaitUrl();
     companionPlaybackArmed = true;
-    try { video.load(); } catch {}
+    loadCompanionVideoSource(video, companionPlaybackWaitUrl());
     void video.play().catch(() => {
       companionPlaybackArmed = false;
     });
@@ -3260,7 +3266,7 @@ async function probeCompanionPlaylist() {
         companionLastRecoveryLoadAt = Date.now();
         companionLastProgressTime = 0;
         companionLastProgressAt = 0;
-        video.load();
+        reloadCompanionVideo(video);
       }
     }
 
@@ -3287,7 +3293,7 @@ async function probeCompanionPlaylist() {
           if ((video.error || stalledPlayback) &&
               now - companionLastRecoveryLoadAt >= 8000) {
             companionLastRecoveryLoadAt = now;
-            video.load();
+            reloadCompanionVideo(video);
           }
           await video.play();
           companionPlaybackArmed = true;
@@ -3430,6 +3436,55 @@ function companionPlaybackWaitUrl() {
   }
 }
 
+function destroyCompanionHlsPlayer() {
+  if (!companionHlsPlayer) return;
+  try { companionHlsPlayer.destroy(); } catch {}
+  companionHlsPlayer = null;
+}
+
+function loadCompanionVideoSource(video, sourceUrl) {
+  destroyCompanionHlsPlayer();
+  const nativeHls = Boolean(
+    video.canPlayType("application/vnd.apple.mpegurl") ||
+    video.canPlayType("application/x-mpegURL")
+  );
+  if (!nativeHls && typeof Hls !== "undefined" && Hls.isSupported()) {
+    const player = new Hls({
+      enableWorker: true,
+      lowLatencyMode: false,
+      backBufferLength: 30,
+      maxBufferLength: 90
+    });
+    companionHlsPlayer = player;
+    player.on(Hls.Events.MEDIA_ATTACHED, () => {
+      if (companionHlsPlayer === player) player.loadSource(sourceUrl);
+    });
+    player.on(Hls.Events.ERROR, (_event, data) => {
+      if (companionHlsPlayer !== player || !data || !data.fatal) return;
+      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        try { player.startLoad(); } catch {}
+      } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        try { player.recoverMediaError(); } catch {}
+      }
+    });
+    player.attachMedia(video);
+    return;
+  }
+  video.src = sourceUrl;
+  try { video.load(); } catch {}
+}
+
+function reloadCompanionVideo(video) {
+  if (companionHlsPlayer) {
+    try {
+      companionHlsPlayer.stopLoad();
+      companionHlsPlayer.startLoad(-1);
+    } catch {}
+    return;
+  }
+  try { video.load(); } catch {}
+}
+
 function stopCompanionPlayback(returnToLive = true) {
   companionModeActive = false;
   companionUserPaused = false;
@@ -3468,6 +3523,7 @@ function stopCompanionPlayback(returnToLive = true) {
 
   const video = $("mediaVideo");
   try { video.pause(); } catch {}
+  destroyCompanionHlsPlayer();
   video.controls = false;
   video.muted = true;
   video.classList.remove("companionPlayback");
@@ -3626,10 +3682,9 @@ async function toggleCompanionMode() {
   video.playsInline = true;
   video.muted = false;
   video.classList.add("companionPlayback");
-  video.src = companionPlaybackWaitUrl();
   video.style.display = "none";
   companionPlaybackArmed = true;
-  try { video.load(); } catch {}
+  loadCompanionVideoSource(video, companionPlaybackWaitUrl());
   void video.play().catch(() => {
     companionPlaybackArmed = false;
   });
