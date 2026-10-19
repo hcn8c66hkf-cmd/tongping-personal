@@ -209,6 +209,16 @@ async function segmentWallEnds(
   );
 }
 
+export function companionEntryCutoff(
+  sessionStartedAt: number | null,
+  entryAtMs: number | null,
+): number | null {
+  return entryAtMs !== null && sessionStartedAt !== null &&
+    Math.abs(entryAtMs - sessionStartedAt) <= 5_000
+      ? null
+      : entryAtMs;
+}
+
 export function sourcePtsAt(
   sample: CompanionSourceTimelineAnchor,
   dateMs: number,
@@ -553,6 +563,17 @@ export class DelayedCompanionHls {
     assertProfile(profile);
     const activeSession = this.sessions.get(profile);
     if (activeSession?.exited) return 0;
+    // A fresh companion entry normally starts this exact recorder generation.
+    // Its playlist cannot contain media from the previous watch because start()
+    // unlinks index.m3u8 and uses generation-unique segment names. On Windows,
+    // filesystem timestamp granularity/order can otherwise make every new
+    // segment look older than the near-simultaneous card entry and pin the UI
+    // at 0 seconds forever. Keep the cutoff only for a genuinely later viewer
+    // that attaches to an already-running generation.
+    const effectiveMinDateMs = companionEntryCutoff(
+      activeSession?.startedAt ?? null,
+      minDateMs,
+    );
     const playlistPath = path.join(this.rootDir, profile, "index.m3u8");
     let text: string;
     try {
@@ -574,7 +595,7 @@ export class DelayedCompanionHls {
       duration = 0;
     }
     const dir = path.join(this.rootDir, profile);
-    const wallEnds = minDateMs === null
+    const wallEnds = effectiveMinDateMs === null
       ? entries.map(() => null)
       : await segmentWallEnds(dir, entries);
     let total = 0;
@@ -582,7 +603,11 @@ export class DelayedCompanionHls {
       // Media written before this companion entry (e.g. before the viewer
       // went back to LIVE) is not part of this watch session's buffer.
       const wallEnd = wallEnds[index] ?? null;
-      if (minDateMs === null || wallEnd === null || wallEnd > minDateMs) {
+      if (
+        effectiveMinDateMs === null ||
+        wallEnd === null ||
+        wallEnd > effectiveMinDateMs
+      ) {
         total += entry.duration;
       }
     });
@@ -598,6 +623,10 @@ export class DelayedCompanionHls {
     assertProfile(profile);
     const activeSession = this.sessions.get(profile);
     if (activeSession?.exited) return null;
+    const effectiveMinDateMs = companionEntryCutoff(
+      activeSession?.startedAt ?? null,
+      minDateMs,
+    );
     const dir = path.join(this.rootDir, profile);
     const playlistPath = path.join(dir, "index.m3u8");
     let text: string;
@@ -657,11 +686,11 @@ export class DelayedCompanionHls {
 
     const wallEnds = await segmentWallEnds(dir, segments);
     let dropped = 0;
-    if (minDateMs !== null) {
+    if (effectiveMinDateMs !== null) {
       while (dropped < segments.length) {
         const segment = segments[dropped]!;
         const wallEnd = wallEnds[dropped] ?? null;
-        if (wallEnd === null || wallEnd > minDateMs) break;
+        if (wallEnd === null || wallEnd > effectiveMinDateMs) break;
         // Keep the newest init map a dropped segment introduced, so the
         // first kept segment still decodes with its own generation's init.
         const map = segment.prelude.find((line) =>
