@@ -3248,7 +3248,7 @@ async function probeCompanionPlaylist() {
     const segmentCount = text
       .split(/\\r?\\n/)
       .map((line) => line.trim())
-      .filter((line) => /\\.m4s(?:\\?|$)/.test(line))
+      .filter((line) => /\\.(?:m4s|ts)(?:\\?|$)/.test(line))
       .length;
 
     if (streamChanged) {

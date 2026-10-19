@@ -4,7 +4,7 @@ import path from "node:path";
 import { mkdir, readFile, readdir, rm, stat, unlink, writeFile } from "node:fs/promises";
 
 const PROFILE_RE = /^[A-Za-z0-9._-]{1,80}$/;
-const SEGMENT_RE = /^(?:init\.mp4|seg_\d{6}\.m4s|init_[A-Za-z0-9_-]{1,80}\.mp4|seg_[A-Za-z0-9_-]{1,80}_\d{1,20}\.m4s)$/;
+const SEGMENT_RE = /^(?:init\.mp4|seg_\d{6}\.(?:m4s|ts)|init_[A-Za-z0-9_-]{1,80}\.mp4|seg_[A-Za-z0-9_-]{1,80}_\d{1,20}\.(?:m4s|ts))$/;
 const DEFAULT_ROOT = path.join((process.env.TONGPING_HOME?.trim() || path.join(os.homedir(), ".tongping")), "companion-hls");
 
 export interface DelayedCompanionFrame {
@@ -163,6 +163,19 @@ export function companionVideoArgs(copy: boolean): string[] {
   ];
 }
 
+// FFmpeg's fragmented-MP4 HLS muxer can keep accepting and encoding a live
+// WebM pipe on Windows without ever publishing its init file or playlist.
+// MPEG-TS HLS has no separate init fragment and is also supported by both
+// Safari's native HLS player and hls.js, so use it for personal Windows
+// installs. Keep fMP4 elsewhere to avoid changing proven deployments.
+export function companionUsesMpegTs(
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  if (process.env.TONGPING_COMPANION_HLS_FMP4 === "1") return false;
+  return process.env.TONGPING_COMPANION_HLS_MPEGTS === "1" ||
+    platform === "win32";
+}
+
 // Source time at a capture wall-clock date, from the newest sample taken at
 // or before it. Samples are re-taken every few seconds, so a looping clip or
 // a switched video is corrected instead of extrapolated forever.
@@ -304,9 +317,10 @@ export class DelayedCompanionHls {
       Math.floor(Date.now() / 1000),
     );
     const initName = "init_" + generationToken + ".mp4";
+    const useMpegTs = companionUsesMpegTs();
     const segmentPattern = path.join(
       dir,
-      "seg_" + generationToken + "_%010d.m4s",
+      "seg_" + generationToken + "_%010d." + (useMpegTs ? "ts" : "m4s"),
     );
 
     const copyVideo =
@@ -345,9 +359,9 @@ export class DelayedCompanionHls {
       "-hls_list_size", "75",
       "-hls_delete_threshold", "5",
       "-hls_flags", "delete_segments+append_list+independent_segments+omit_endlist+program_date_time",
-      "-hls_segment_type", "fmp4",
+      "-hls_segment_type", useMpegTs ? "mpegts" : "fmp4",
       "-start_number", String(mediaSequenceBase),
-      "-hls_fmp4_init_filename", initName,
+      ...(useMpegTs ? [] : ["-hls_fmp4_init_filename", initName]),
       "-hls_segment_filename", segmentPattern,
       playlist,
     ];

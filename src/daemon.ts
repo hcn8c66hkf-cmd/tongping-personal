@@ -2676,7 +2676,7 @@ const server = http.createServer(async (request, response) => {
         });
       }
       response.writeHead(200, {
-        "content-type": "video/mp4",
+        "content-type": name.endsWith(".ts") ? "video/mp2t" : "video/mp4",
         "content-length": body.length,
         "cache-control": "private, max-age=20",
         "access-control-allow-origin": "*",

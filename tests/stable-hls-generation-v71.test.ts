@@ -8,7 +8,7 @@ const daemon = fs.readFileSync(new URL("../src/daemon.ts", import.meta.url), "ut
 
 test("HLS generations use unique init/segment names and monotonic start numbers", () => {
   assert.ok(hls.includes('const initName = "init_" + generationToken + ".mp4"'));
-  assert.ok(hls.includes('"seg_" + generationToken + "_%010d.m4s"'));
+  assert.ok(hls.includes('"seg_" + generationToken + "_%010d." + (useMpegTs ? "ts" : "m4s")'));
   assert.ok(hls.includes('"-start_number", String(mediaSequenceBase)'));
   assert.ok(hls.includes('out.push("#EXT-X-DISCONTINUITY")'));
 });

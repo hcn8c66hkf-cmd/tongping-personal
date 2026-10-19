@@ -7,8 +7,8 @@ const mcp = fs.readFileSync(new URL("../src/mcp-server.ts", import.meta.url), "u
 
 test("HLS probe counts segment URI lines across newlines", () => {
   assert.ok(app.includes(".split(/\\\\r?\\\\n/)"));
-  assert.ok(app.includes(".filter((line) => /\\\\.m4s(?:\\\\?|$)/.test(line))"));
-  assert.ok(!app.includes("text.match(/\\\\.m4s(?:\\\\?|$)/g"));
+  assert.ok(app.includes(".filter((line) => /\\\\.(?:m4s|ts)(?:\\\\?|$)/.test(line))"));
+  assert.ok(!app.includes("text.match(/\\\\.(?:m4s|ts)(?:\\\\?|$)/g"));
 });
 
 test("app v60 keeps cached v59 cards compatible", () => {
