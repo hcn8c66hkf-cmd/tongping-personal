@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-export const BROWSER_APP_URI = "ui://tongping/shared-browser-v102";
+export const BROWSER_APP_URI = "ui://tongping/shared-browser-v104";
 
 // Keep the MCP Apps bridge inside the component HTML. A second module request
 // could be blocked or time out in the ChatGPT iOS component sandbox, leaving
