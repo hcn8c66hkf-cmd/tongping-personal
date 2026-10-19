@@ -33,7 +33,18 @@ if (version.status !== 0) {
   );
 }
 
-const existing = await findNgrokTunnel(port).catch(() => null);
+let existing = await findNgrokTunnel(port).catch(() => null);
+if (existing && await endpointIsOffline(existing)) {
+  console.log("发现已失效的 ngrok 残留进程，正在自动清理……");
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/F", "/IM", "ngrok.exe"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 700));
+  }
+  existing = null;
+}
 let ngrok = null;
 let publicOrigin = existing;
 
@@ -141,6 +152,19 @@ async function findNgrokTunnel(targetPort) {
     );
   });
   return tunnel ? new URL(tunnel.public_url).origin : null;
+}
+
+async function endpointIsOffline(origin) {
+  try {
+    const response = await fetch(origin + "/health", {
+      signal: AbortSignal.timeout(4_000),
+    });
+    return response.headers.get("ngrok-error-code") === "ERR_NGROK_3200";
+  } catch {
+    // A timeout or local upstream error does not prove the public endpoint is
+    // gone. Only ngrok's explicit offline code is safe to clean automatically.
+    return false;
+  }
 }
 
 function writePublicOrigin(file, origin) {
