@@ -29,6 +29,16 @@ if not exist "node_modules\" (
   )
 )
 
+if not exist "node_modules\hls.js\dist\hls.light.min.js" (
+  echo 正在补充电脑端陪看播放器（只需一次）...
+  call npm ci --no-audit --no-fund
+  if errorlevel 1 (
+    echo [错误] 电脑端陪看播放器安装失败。
+    pause
+    exit /b 1
+  )
+)
+
 if not exist ".env" (
   copy /y ".env.example" ".env" >nul
   echo 已根据 .env.example 生成 .env。
