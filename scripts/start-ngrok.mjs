@@ -118,7 +118,7 @@ console.log("同屏和固定隧道均已就绪（启动器 v107）。");
 console.log("");
 
 async function clearStaleLocalTongping(targetPort) {
-  if (!/^\\d+$/.test(String(targetPort))) {
+  if (!/^\d+$/.test(String(targetPort))) {
     fail("TONGPING_PORT 必须是数字端口。");
   }
 
