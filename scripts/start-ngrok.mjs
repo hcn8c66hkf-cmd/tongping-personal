@@ -50,6 +50,11 @@ await clearStaleLocalTongping(port, 0);
 const testPauseAfterPreflight = Number(
   process.env.TONGPING_TEST_PAUSE_AFTER_PREFLIGHT_MS || "0",
 );
+const testPreflightMarker =
+  process.env.TONGPING_TEST_PREFLIGHT_MARKER?.trim() || "";
+if (testPreflightMarker) {
+  writeFileSync(testPreflightMarker, "ready", "utf8");
+}
 if (Number.isFinite(testPauseAfterPreflight) && testPauseAfterPreflight > 0) {
   await new Promise((resolve) => setTimeout(resolve, testPauseAfterPreflight));
 }
