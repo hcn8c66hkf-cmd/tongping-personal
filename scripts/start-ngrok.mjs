@@ -217,8 +217,9 @@ function isPortOpen(targetPort) {
 async function startTongpingReady(publicOrigin) {
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     recoveringTongping = true;
+    const previousStartupId = await readTongpingStartupId(port);
     const child = startTongping(publicOrigin);
-    const ready = await waitForTongping(port, child);
+    const ready = await waitForTongping(port, child, previousStartupId);
     if (ready) {
       recoveringTongping = false;
       return child;
@@ -248,7 +249,23 @@ function startTongping(publicOrigin) {
   return child;
 }
 
-async function waitForTongping(targetPort, child) {
+async function readTongpingStartupId(targetPort) {
+  try {
+    const response = await fetch(
+      "http://127.0.0.1:" + targetPort + "/health",
+      { signal: AbortSignal.timeout(1_500) },
+    );
+    if (!response.ok) return null;
+    const health = await response.json().catch(() => null);
+    return typeof health?.startupId === "string" && health.startupId
+      ? health.startupId
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function waitForTongping(targetPort, child, previousStartupId = null) {
   const origin = "http://127.0.0.1:" + targetPort;
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
@@ -261,7 +278,12 @@ async function waitForTongping(targetPort, child) {
       });
       if (response.ok) {
         const health = await response.json().catch(() => null);
-        if (health?.service === "tongping") return true;
+        if (
+          health?.service === "tongping" &&
+          typeof health?.startupId === "string" &&
+          health.startupId &&
+          health.startupId !== previousStartupId
+        ) return true;
       }
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 350));
