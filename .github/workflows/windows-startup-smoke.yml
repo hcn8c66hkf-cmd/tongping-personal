@@ -5,6 +5,7 @@ on:
     branches:
       - windows-startup-diagnosis-v106-20261105
       - windows-companion-playback-v107-20261105
+      - windows-companion-playback-v108-20261105
   workflow_dispatch:
 
 jobs:
@@ -106,32 +107,35 @@ jobs:
           TONGPING_PUBLIC_ORIGIN=https://eatable-derail-moonscape.ngrok-free.dev
           "@ | Set-Content -Path .env -Encoding utf8
 
-          # Reproduce the user's real failure: an older TongPing still owns the
-          # port for a moment when the new one-click launcher starts.
-          $env:TONGPING_HOME = $tongpingTestHome
-          $env:TONGPING_PORT = "45931"
-          $env:TONGPING_HEADLESS = "1"
-          $env:TONGPING_PUBLIC_ORIGIN = "https://eatable-derail-moonscape.ngrok-free.dev"
-          $staleOut = Join-Path $env:RUNNER_TEMP "stale-out.log"
-          $staleErr = Join-Path $env:RUNNER_TEMP "stale-err.log"
-          $stale = Start-Process -FilePath node -ArgumentList "scripts/start.mjs" -PassThru -NoNewWindow -RedirectStandardOutput $staleOut -RedirectStandardError $staleErr
-          $staleHealthy = $false
-          for ($i = 0; $i -lt 60; $i++) {
-            if ($stale.HasExited) { break }
-            try {
-              $staleHealth = Invoke-RestMethod -Uri "http://127.0.0.1:45931/health" -TimeoutSec 2
-              if ($staleHealth.service -eq "tongping") {
-                $staleHealthy = $true
-                break
-              }
-            } catch {}
-            Start-Sleep -Milliseconds 500
-          }
-          if (-not $staleHealthy) {
-            Get-Content $staleOut -ErrorAction SilentlyContinue
-            Get-Content $staleErr -ErrorAction SilentlyContinue
-            throw "Could not create stale TongPing listener for regression test"
-          }
+          # Reproduce the user's later race: the port is free during the
+          # launcher's preflight, then an older TongPing appears while the new
+          # daemon is still starting.
+          @'
+          import http.server
+          import json
+          import time
+
+          time.sleep(0.45)
+
+          class LateTongPing(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path == "/health":
+                      body = json.dumps({"service": "tongping"}).encode()
+                      self.send_response(200)
+                      self.send_header("Content-Type", "application/json")
+                      self.send_header("Content-Length", str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+
+              def log_message(self, *_):
+                  pass
+
+          http.server.ThreadingHTTPServer(("127.0.0.1", 45931), LateTongPing).serve_forever()
+          '@ | Set-Content -Path late_tongping.py -Encoding utf8
+          $stale = Start-Process -FilePath python -ArgumentList "late_tongping.py" -PassThru -NoNewWindow
 
           $env:TONGPING_NGROK_BIN = "python"
           $stdout = Join-Path $env:RUNNER_TEMP "one-click-out.log"
@@ -154,7 +158,7 @@ jobs:
             for ($i = 0; $i -lt 90; $i++) {
               if ($process.HasExited) { break }
               $partial = Get-Content $stdout -Raw -ErrorAction SilentlyContinue
-              if ($partial -and $partial.IndexOf("同屏和固定隧道均已就绪（启动器 v107）") -ge 0) {
+              if ($partial -and $partial.IndexOf("同屏和固定隧道均已就绪（启动器 v108）") -ge 0) {
                 $readyMarker = $true
                 break
               }
