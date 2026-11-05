@@ -115,7 +115,7 @@ jobs:
           import json
           import time
 
-          time.sleep(0.45)
+          time.sleep(0.10)
 
           class LateTongPing(http.server.BaseHTTPRequestHandler):
               def do_GET(self):
@@ -171,6 +171,9 @@ jobs:
             Write-Output $err
             if (-not $readyMarker -or $process.HasExited) {
               throw "Complete one-click launcher did not reach the v107 ready marker"
+            }
+            if ($out.IndexOf("检测到启动途中端口碰撞") -lt 0) {
+              throw "Launcher did not enter late-collision recovery"
             }
             if ($out.IndexOf("旧同屏已清理，端口已释放") -lt 0) {
               throw "Launcher did not clean the stale TongPing listener"
