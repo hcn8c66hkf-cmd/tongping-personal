@@ -63,3 +63,86 @@ jobs:
               Where-Object { $_.CommandLine -like "*$env:TONGPING_HOME*" -or $_.CommandLine -like "*scripts/start.mjs*" } |
               ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
           }
+      - name: Run complete one-click launcher with isolated ngrok
+        shell: pwsh
+        run: |
+          @'
+          print("ngrok version fake")
+          '@ | Set-Content -Path version -Encoding utf8
+          @'
+          import http.server
+          import json
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path.startswith("/api/tunnels"):
+                      body = json.dumps({
+                          "tunnels": [{
+                              "public_url": "https://eatable-derail-moonscape.ngrok-free.dev",
+                              "config": {"addr": "http://localhost:45931"}
+                          }]
+                      }).encode()
+                      self.send_response(200)
+                      self.send_header("Content-Type", "application/json")
+                      self.send_header("Content-Length", str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+
+              def log_message(self, *_):
+                  pass
+
+          http.server.ThreadingHTTPServer(("127.0.0.1", 4040), Handler).serve_forever()
+          '@ | Set-Content -Path http -Encoding utf8
+
+          $home = Join-Path $env:RUNNER_TEMP "tongping-one-click"
+          @"
+          TONGPING_HOME=$home
+          TONGPING_PORT=45931
+          TONGPING_HEADLESS=1
+          TONGPING_PUBLIC_ORIGIN=https://eatable-derail-moonscape.ngrok-free.dev
+          "@ | Set-Content -Path .env -Encoding utf8
+
+          $env:TONGPING_NGROK_BIN = "python"
+          $stdout = Join-Path $env:RUNNER_TEMP "one-click-out.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "one-click-err.log"
+          $process = Start-Process -FilePath node -ArgumentList "scripts/start-ngrok.mjs" -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          try {
+            $healthy = $false
+            for ($i = 0; $i -lt 90; $i++) {
+              if ($process.HasExited) { break }
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:45931/health" -TimeoutSec 2
+                if ($health.service -eq "tongping") {
+                  $healthy = $true
+                  break
+                }
+              } catch {}
+              Start-Sleep -Milliseconds 500
+            }
+            Start-Sleep -Seconds 2
+            $out = Get-Content $stdout -Raw -ErrorAction SilentlyContinue
+            $err = Get-Content $stderr -Raw -ErrorAction SilentlyContinue
+            Write-Output $out
+            Write-Output $err
+            if (-not $healthy -or $process.HasExited) {
+              throw "Complete one-click launcher did not stay healthy"
+            }
+            $localReady = $out.IndexOf("本地同屏已就绪")
+            $tunnelStart = $out.IndexOf("正在连接固定 ngrok 隧道")
+            $allReady = $out.IndexOf("同屏和固定隧道均已就绪")
+            if ($localReady -lt 0 -or $tunnelStart -le $localReady -or $allReady -le $tunnelStart) {
+              throw "One-click launcher lifecycle order was not observed"
+            }
+          } finally {
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+            foreach ($port in 45931,4040) {
+              Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty OwningProcess -Unique |
+                ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+            }
+          }
