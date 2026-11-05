@@ -97,9 +97,9 @@ jobs:
           http.server.ThreadingHTTPServer(("127.0.0.1", 4040), Handler).serve_forever()
           '@ | Set-Content -Path http -Encoding utf8
 
-          $home = Join-Path $env:RUNNER_TEMP "tongping-one-click"
+          $tongpingTestHome = Join-Path $env:RUNNER_TEMP "tongping-one-click"
           @"
-          TONGPING_HOME=$home
+          TONGPING_HOME=$tongpingTestHome
           TONGPING_PORT=45931
           TONGPING_HEADLESS=1
           TONGPING_PUBLIC_ORIGIN=https://eatable-derail-moonscape.ngrok-free.dev
