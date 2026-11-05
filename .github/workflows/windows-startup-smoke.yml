@@ -113,9 +113,6 @@ jobs:
           @'
           import http.server
           import json
-          import time
-
-          time.sleep(0.30)
 
           class LateTongPing(http.server.BaseHTTPRequestHandler):
               def do_GET(self):
@@ -135,13 +132,40 @@ jobs:
 
           http.server.ThreadingHTTPServer(("127.0.0.1", 45931), LateTongPing).serve_forever()
           '@ | Set-Content -Path late_tongping.py -Encoding utf8
-          $stale = Start-Process -FilePath python -ArgumentList "late_tongping.py" -PassThru -NoNewWindow
-
           $env:TONGPING_NGROK_BIN = "python"
-          $env:TONGPING_TEST_PAUSE_AFTER_PREFLIGHT_MS = "800"
+          $env:TONGPING_TEST_PAUSE_AFTER_PREFLIGHT_MS = "3000"
+          $preflightMarker = Join-Path $env:RUNNER_TEMP "tongping-preflight-ready"
+          $env:TONGPING_TEST_PREFLIGHT_MARKER = $preflightMarker
           $stdout = Join-Path $env:RUNNER_TEMP "one-click-out.log"
           $stderr = Join-Path $env:RUNNER_TEMP "one-click-err.log"
           $process = Start-Process -FilePath node -ArgumentList "scripts/start-ngrok.mjs" -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+
+          $preflightObserved = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            if ($process.HasExited) { break }
+            if (Test-Path $preflightMarker) {
+              $preflightObserved = $true
+              break
+            }
+            Start-Sleep -Milliseconds 50
+          }
+          if (-not $preflightObserved) {
+            throw "Launcher did not expose the deterministic preflight marker"
+          }
+
+          $stale = Start-Process -FilePath python -ArgumentList "late_tongping.py" -PassThru -NoNewWindow
+          $staleListening = $false
+          for ($i = 0; $i -lt 40; $i++) {
+            if (Get-NetTCPConnection -LocalPort 45931 -State Listen -ErrorAction SilentlyContinue) {
+              $staleListening = $true
+              break
+            }
+            Start-Sleep -Milliseconds 50
+          }
+          if (-not $staleListening) {
+            throw "Late TongPing fixture did not acquire port 45931"
+          }
+
           try {
             $healthy = $false
             for ($i = 0; $i -lt 90; $i++) {
@@ -171,7 +195,7 @@ jobs:
             Write-Output $out
             Write-Output $err
             if (-not $readyMarker -or $process.HasExited) {
-              throw "Complete one-click launcher did not reach the v107 ready marker"
+              throw "Complete one-click launcher did not reach the v108 ready marker"
             }
             if ($out.IndexOf("检测到启动途中端口碰撞") -lt 0) {
               throw "Launcher did not enter late-collision recovery"
