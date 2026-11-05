@@ -17,6 +17,17 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm ci --ignore-scripts
+      - name: Check one-click launcher syntax
+        run: node --check scripts/start-ngrok.mjs
+      - name: Verify local-first startup order
+        shell: pwsh
+        run: |
+          $source = Get-Content scripts/start-ngrok.mjs -Raw
+          $local = $source.IndexOf('正在先启动本地同屏')
+          $tunnel = $source.IndexOf('正在连接固定 ngrok 隧道')
+          if ($local -lt 0 -or $tunnel -lt 0 -or $local -ge $tunnel) {
+            throw "One-click launcher does not start local TongPing before ngrok"
+          }
       - name: Start TongPing and verify health
         shell: pwsh
         run: |
