@@ -46,6 +46,46 @@ import {
 
 const BROWSER_APP_MIME_TYPE = "text/html;profile=mcp-app";
 
+export function buildBrowserAppResourceMeta(
+  appOrigin: string,
+  appWsOrigin: string,
+  appDomain?: string,
+  includeOpenAiAliases = true,
+): Record<string, unknown> {
+  const resourceDomains = [appOrigin, "https://cdn.jsdelivr.net"];
+  const connectDomains = [
+    appOrigin,
+    appWsOrigin,
+    "https://cdn.jsdelivr.net",
+    "https://storage.googleapis.com",
+  ];
+  return {
+    ui: {
+      csp: {
+        // jsdelivr / googleapis: MediaPipe face landmarker for camera effects.
+        resourceDomains,
+        connectDomains,
+      },
+      // Hold-to-talk and 「让 TA 看看你」; hosts may decline, the card feature-detects.
+      permissions: { microphone: {}, camera: {} },
+      prefersBorder: false,
+      ...(appDomain ? { domain: appDomain } : {}),
+    },
+    ...(includeOpenAiAliases
+      ? {
+          // These aliases must be direct children of resource _meta. Putting
+          // them under _meta.ui makes legacy ChatGPT hosts silently miss them.
+          "openai/widgetCSP": {
+            resource_domains: resourceDomains,
+            connect_domains: connectDomains,
+          },
+          "openai/widgetPrefersBorder": false,
+          ...(appDomain ? { "openai/widgetDomain": appDomain } : {}),
+        }
+      : {}),
+  };
+}
+
 function stampBrowserAppBuildOnMediaUrl(rawUrl: string): string {
   try {
     const url = new URL(rawUrl);
@@ -1843,34 +1883,12 @@ export function createTongpingMcpServer(
     },
   );
 
-  const appResourceDomains = [appOrigin, "https://cdn.jsdelivr.net"];
-  const appConnectDomains = [
+  const browserAppResourceMeta = buildBrowserAppResourceMeta(
     appOrigin,
     appWsOrigin,
-    "https://cdn.jsdelivr.net",
-    "https://storage.googleapis.com",
-  ];
-  const uiMeta = {
-    csp: {
-      // jsdelivr / googleapis: MediaPipe face landmarker for the camera effects.
-      resourceDomains: appResourceDomains,
-      connectDomains: appConnectDomains,
-    },
-    // ChatGPT iOS compatibility aliases. Keep these beside the standard
-    // ui.csp fields until every supported host reads the MCP Apps names.
-    "openai/widgetCSP": {
-      resource_domains: appResourceDomains,
-      connect_domains: appConnectDomains,
-    },
-    "openai/widgetPrefersBorder": false,
-    // Hold-to-talk and 「让 TA 看看你」; hosts may decline, the card feature-detects.
-    permissions: { microphone: {}, camera: {} },
-    prefersBorder: false,
-    ...(appDomain
-      ? { domain: appDomain, "openai/widgetDomain": appDomain }
-      : {}),
-  };
-  if (claudeHostSession) delete (uiMeta as Record<string, unknown>).domain;
+    claudeHostSession ? undefined : appDomain,
+    !claudeHostSession,
+  );
 
   // Claude host contract:
   // a "domain" field here makes EVERY ext-apps card fail with
@@ -1911,7 +1929,7 @@ export function createTongpingMcpServer(
       mimeType: BROWSER_APP_MIME_TYPE,
       description:
         "Large shared persistent-browser controller for direct human takeover and AI collaboration.",
-      _meta: { ui: uiMeta },
+      _meta: browserAppResourceMeta,
     },
     async () => ({
       contents: [
@@ -1919,7 +1937,7 @@ export function createTongpingMcpServer(
           uri: BROWSER_APP_URI,
           mimeType: BROWSER_APP_MIME_TYPE,
           text: renderBrowserApp(appOrigin),
-          _meta: { ui: uiMeta },
+          _meta: browserAppResourceMeta,
         },
       ],
     }),
@@ -1979,7 +1997,7 @@ export function createTongpingMcpServer(
         mimeType: BROWSER_APP_MIME_TYPE,
         description:
           "Compatibility alias for recent 同屏 cards, serving the current renderer.",
-        _meta: { ui: uiMeta },
+        _meta: browserAppResourceMeta,
       },
       async () => ({
         contents: [
@@ -1987,7 +2005,7 @@ export function createTongpingMcpServer(
             uri: recentCompatUri,
             mimeType: BROWSER_APP_MIME_TYPE,
             text: renderBrowserApp(appOrigin),
-            _meta: { ui: uiMeta },
+            _meta: browserAppResourceMeta,
           },
         ],
       }),
@@ -2001,7 +2019,7 @@ export function createTongpingMcpServer(
       mimeType: BROWSER_APP_MIME_TYPE,
       description:
         "Compatibility alias for 同屏 v12 cards, serving the current renderer.",
-      _meta: { ui: uiMeta },
+      _meta: browserAppResourceMeta,
     },
     async () => ({
       contents: [
@@ -2009,7 +2027,7 @@ export function createTongpingMcpServer(
           uri: "ui://tongping/shared-browser-v12",
           mimeType: BROWSER_APP_MIME_TYPE,
           text: renderBrowserApp(appOrigin),
-          _meta: { ui: uiMeta },
+          _meta: browserAppResourceMeta,
         },
       ],
     }),
@@ -2022,7 +2040,7 @@ export function createTongpingMcpServer(
       mimeType: BROWSER_APP_MIME_TYPE,
       description:
         "Compatibility alias for 同屏 v11 cards, serving the current renderer.",
-      _meta: { ui: uiMeta },
+      _meta: browserAppResourceMeta,
     },
     async () => ({
       contents: [
@@ -2030,7 +2048,7 @@ export function createTongpingMcpServer(
           uri: "ui://tongping/shared-browser-v11",
           mimeType: BROWSER_APP_MIME_TYPE,
           text: renderBrowserApp(appOrigin),
-          _meta: { ui: uiMeta },
+          _meta: browserAppResourceMeta,
         },
       ],
     }),
@@ -2043,7 +2061,7 @@ export function createTongpingMcpServer(
       mimeType: BROWSER_APP_MIME_TYPE,
       description:
         "Compatibility alias for 同屏 v5 cards.",
-      _meta: { ui: uiMeta },
+      _meta: browserAppResourceMeta,
     },
     async () => ({
       contents: [
@@ -2051,7 +2069,7 @@ export function createTongpingMcpServer(
           uri: "ui://tongping/shared-browser-v5",
           mimeType: BROWSER_APP_MIME_TYPE,
           text: renderBrowserApp(appOrigin),
-          _meta: { ui: uiMeta },
+          _meta: browserAppResourceMeta,
         },
       ],
     }),
@@ -2064,7 +2082,7 @@ export function createTongpingMcpServer(
       mimeType: BROWSER_APP_MIME_TYPE,
       description:
         "Compatibility alias for 同屏 v4 cards.",
-      _meta: { ui: uiMeta },
+      _meta: browserAppResourceMeta,
     },
     async () => ({
       contents: [
@@ -2072,7 +2090,7 @@ export function createTongpingMcpServer(
           uri: "ui://tongping/shared-browser-v4",
           mimeType: BROWSER_APP_MIME_TYPE,
           text: renderBrowserApp(appOrigin),
-          _meta: { ui: uiMeta },
+          _meta: browserAppResourceMeta,
         },
       ],
     }),
@@ -2085,7 +2103,7 @@ export function createTongpingMcpServer(
       mimeType: BROWSER_APP_MIME_TYPE,
       description:
         "Compatibility alias for 同屏 v3 cards.",
-      _meta: { ui: uiMeta },
+      _meta: browserAppResourceMeta,
     },
     async () => ({
       contents: [
@@ -2093,7 +2111,7 @@ export function createTongpingMcpServer(
           uri: "ui://tongping/shared-browser-v3",
           mimeType: BROWSER_APP_MIME_TYPE,
           text: renderBrowserApp(appOrigin),
-          _meta: { ui: uiMeta },
+          _meta: browserAppResourceMeta,
         },
       ],
     }),
@@ -2106,7 +2124,7 @@ export function createTongpingMcpServer(
       mimeType: BROWSER_APP_MIME_TYPE,
       description:
         "Compatibility alias for previously rendered 同屏 cards.",
-      _meta: { ui: uiMeta },
+      _meta: browserAppResourceMeta,
     },
     async () => ({
       contents: [
@@ -2114,7 +2132,7 @@ export function createTongpingMcpServer(
           uri: "ui://tongping/shared-browser-v2",
           mimeType: BROWSER_APP_MIME_TYPE,
           text: renderBrowserApp(appOrigin),
-          _meta: { ui: uiMeta },
+          _meta: browserAppResourceMeta,
         },
       ],
     }),
