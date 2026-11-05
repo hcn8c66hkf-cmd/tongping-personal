@@ -8,6 +8,7 @@
 // daemon 和 worker 使用同一个 TONGPING_HOME 下的两个子目录，避免两个进程抢同一个
 // Chromium profile 锁。
 import { spawn, spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -32,6 +33,7 @@ const localUrl = `http://127.0.0.1:${port}`;
 const daemonHome = path.join(home, "daemon");
 const workerHome = path.join(home, "worker");
 const tsxCli = path.join(root, "node_modules", "tsx", "dist", "cli.mjs");
+const startupId = randomUUID();
 
 // Publishing through a tunnel: accept the tunnel hostname without making the
 // user hand-maintain TONGPING_ALLOWED_HOSTS / _ORIGINS.
@@ -58,6 +60,7 @@ const daemon = run("daemon", path.join(root, "src", "daemon.ts"), {
   TONGPING_PORT: port,
   TONGPING_HOST: process.env.TONGPING_HOST?.trim() || "127.0.0.1",
   TONGPING_REMOTE_WORKER: "1",
+  TONGPING_STARTUP_ID: startupId,
   TONGPING_ALLOWED_HOSTS: hostAllowList("TONGPING_ALLOWED_HOSTS"),
   TONGPING_ALLOWED_ORIGINS: hostAllowList("TONGPING_ALLOWED_ORIGINS"),
   // Personal edition: the local worker authenticates with the daemon's
@@ -68,7 +71,7 @@ const daemon = run("daemon", path.join(root, "src", "daemon.ts"), {
   TONGPING_CLOUD_URL: localUrl,
 });
 
-await waitForHealth(localUrl, daemon);
+await waitForHealth(localUrl, daemon, startupId);
 const workerToken = readFileSync(path.join(daemonHome, "worker-auth", "worker-token"), "utf8").trim();
 
 run("worker", path.join(root, "src", "worker-client.ts"), {
@@ -129,13 +132,19 @@ function run(name, entry, extraEnv) {
   return child;
 }
 
-async function waitForHealth(url, child) {
+async function waitForHealth(url, child, expectedStartupId) {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) process.exit(child.exitCode || 1);
     try {
       const response = await fetch(url + "/health");
-      if (response.ok) return;
+      if (response.ok) {
+        const health = await response.json().catch(() => null);
+        if (
+          health?.service === "tongping" &&
+          health?.startupId === expectedStartupId
+        ) return;
+      }
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
