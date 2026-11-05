@@ -40,16 +40,16 @@ let ngrok = null;
 let tongping = null;
 let stopping = false;
 let restartingTongping = false;
+let recoveringTongping = false;
 
 process.on("SIGINT", () => stopAll(0));
 process.on("SIGTERM", () => stopAll(0));
 
 const configuredPublicOrigin = normalizeOrigin(env.TONGPING_PUBLIC_ORIGIN);
-await clearStaleLocalTongping(port);
+await clearStaleLocalTongping(port, 0);
 if (configuredPublicOrigin) {
   console.log("正在先启动本地同屏……");
-  tongping = startTongping(configuredPublicOrigin);
-  await waitForTongping(port, tongping);
+  tongping = await startTongpingReady(configuredPublicOrigin);
   console.log("本地同屏已就绪，正在开放固定隧道……");
 }
 
@@ -104,32 +104,36 @@ if (tongping && configuredPublicOrigin !== publicOrigin) {
   restartingTongping = true;
   await stopChild(tongping);
   restartingTongping = false;
-  tongping = startTongping(publicOrigin);
+  tongping = await startTongpingReady(publicOrigin);
 }
 if (!tongping) {
   console.log("正在启动同屏……");
-  tongping = startTongping(publicOrigin);
+  tongping = await startTongpingReady(publicOrigin);
 }
-await waitForTongping(port, tongping);
 
 console.log("固定公网地址：" + publicOrigin);
 console.log("ChatGPT / Claude 的 MCP 地址：" + publicOrigin + "/mcp");
-console.log("同屏和固定隧道均已就绪（启动器 v107）。");
+console.log("同屏和固定隧道均已就绪（启动器 v108）。");
 console.log("");
 
-async function clearStaleLocalTongping(targetPort) {
+async function clearStaleLocalTongping(targetPort, waitForHealthMs = 0) {
   if (!/^\d+$/.test(String(targetPort))) {
     fail("TONGPING_PORT 必须是数字端口。");
   }
 
   const origin = "http://127.0.0.1:" + targetPort;
   let health = null;
-  try {
-    const response = await fetch(origin + "/health", {
-      signal: AbortSignal.timeout(1_500),
-    });
-    if (response.ok) health = await response.json().catch(() => null);
-  } catch {}
+  const healthDeadline = Date.now() + waitForHealthMs;
+  do {
+    try {
+      const response = await fetch(origin + "/health", {
+        signal: AbortSignal.timeout(1_500),
+      });
+      if (response.ok) health = await response.json().catch(() => null);
+    } catch {}
+    if (health?.service === "tongping" || Date.now() >= healthDeadline) break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  } while (true);
 
   if (health?.service === "tongping") {
     if (process.platform !== "win32") {
@@ -199,6 +203,24 @@ function isPortOpen(targetPort) {
   });
 }
 
+async function startTongpingReady(publicOrigin) {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    recoveringTongping = true;
+    const child = startTongping(publicOrigin);
+    const ready = await waitForTongping(port, child);
+    if (ready) {
+      recoveringTongping = false;
+      return child;
+    }
+
+    console.log("检测到启动途中端口碰撞，正在等待旧同屏退出并自动重试……");
+    await clearStaleLocalTongping(port, 5_000);
+  }
+
+  recoveringTongping = false;
+  fail("本地同屏重试后仍未启动成功。请把上面的日志发给 AI。");
+}
+
 function startTongping(publicOrigin) {
   const child = spawn(process.execPath, [path.join(root, "scripts", "start.mjs")], {
     cwd: root,
@@ -210,7 +232,7 @@ function startTongping(publicOrigin) {
     windowsHide: false,
   });
   child.on("exit", (code) => {
-    if (!stopping && !restartingTongping) stopAll(code || 1);
+    if (!stopping && !restartingTongping && !recoveringTongping) stopAll(code || 1);
   });
   return child;
 }
@@ -220,7 +242,7 @@ async function waitForTongping(targetPort, child) {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
-      fail("本地同屏没有启动成功。请查看上面的 [daemon] / [worker] 日志。");
+      return false;
     }
     try {
       const response = await fetch(origin + "/health", {
@@ -228,7 +250,7 @@ async function waitForTongping(targetPort, child) {
       });
       if (response.ok) {
         const health = await response.json().catch(() => null);
-        if (health?.service === "tongping") return;
+        if (health?.service === "tongping") return true;
       }
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 350));
