@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { buildBrowserAppResourceMeta } from "../src/mcp-server.js";
+import {
+  buildBrowserAppResourceMeta,
+  RECENT_BROWSER_APP_COMPAT_URIS,
+} from "../src/mcp-server.js";
 
 const source = readFileSync(new URL("../src/mcp-server.ts", import.meta.url), "utf8");
 
@@ -58,4 +61,16 @@ test("non-ChatGPT hosts receive only standard MCP Apps UI metadata", () => {
   assert.equal(meta.ui.domain, undefined);
   assert.equal(meta["openai/widgetCSP"], undefined);
   assert.equal(meta["openai/widgetDomain"], undefined);
+});
+
+test("cached ChatGPT tool descriptors from recent app builds still resolve", () => {
+  assert.equal(RECENT_BROWSER_APP_COMPAT_URIS[0], "ui://tongping/shared-browser-v109");
+  assert.ok(RECENT_BROWSER_APP_COMPAT_URIS.includes("ui://tongping/shared-browser-v105"));
+  assert.ok(RECENT_BROWSER_APP_COMPAT_URIS.includes("ui://tongping/shared-browser-v73"));
+  assert.ok(RECENT_BROWSER_APP_COMPAT_URIS.includes("ui://tongping/shared-browser-v72"));
+  assert.equal(
+    RECENT_BROWSER_APP_COMPAT_URIS.at(-1),
+    "ui://tongping/shared-browser-v24",
+  );
+  assert.equal(RECENT_BROWSER_APP_COMPAT_URIS.includes("ui://tongping/shared-browser-v111"), false);
 });
