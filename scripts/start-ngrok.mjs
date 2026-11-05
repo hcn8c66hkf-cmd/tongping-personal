@@ -6,6 +6,7 @@
 //   4. Start TongPing with that origin already in the process environment.
 // Ctrl+C stops both TongPing and ngrok.
 import { spawn, spawnSync } from "node:child_process";
+import net from "node:net";
 import {
   existsSync,
   readFileSync,
@@ -44,6 +45,7 @@ process.on("SIGINT", () => stopAll(0));
 process.on("SIGTERM", () => stopAll(0));
 
 const configuredPublicOrigin = normalizeOrigin(env.TONGPING_PUBLIC_ORIGIN);
+await clearStaleLocalTongping(port);
 if (configuredPublicOrigin) {
   console.log("正在先启动本地同屏……");
   tongping = startTongping(configuredPublicOrigin);
@@ -112,8 +114,90 @@ await waitForTongping(port, tongping);
 
 console.log("固定公网地址：" + publicOrigin);
 console.log("ChatGPT / Claude 的 MCP 地址：" + publicOrigin + "/mcp");
-console.log("同屏和固定隧道均已就绪（启动器 v106）。");
+console.log("同屏和固定隧道均已就绪（启动器 v107）。");
 console.log("");
+
+async function clearStaleLocalTongping(targetPort) {
+  if (!/^\\d+$/.test(String(targetPort))) {
+    fail("TONGPING_PORT 必须是数字端口。");
+  }
+
+  const origin = "http://127.0.0.1:" + targetPort;
+  let health = null;
+  try {
+    const response = await fetch(origin + "/health", {
+      signal: AbortSignal.timeout(1_500),
+    });
+    if (response.ok) health = await response.json().catch(() => null);
+  } catch {}
+
+  if (health?.service === "tongping") {
+    if (process.platform !== "win32") {
+      fail("发现已有同屏占用端口 " + targetPort + "。请先关闭旧同屏再重试。");
+    }
+
+    console.log("发现上一轮同屏仍占用端口，正在安全清理……");
+    const owner = spawnSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "(Get-NetTCPConnection -LocalPort " + targetPort +
+          " -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess",
+      ],
+      { encoding: "utf8", windowsHide: true },
+    );
+    const pid = Number(String(owner.stdout || "").trim());
+    if (!Number.isInteger(pid) || pid <= 0) {
+      fail("确认是旧同屏占用，但没有取得它的进程编号。请把日志发给 AI。");
+    }
+    const killed = spawnSync("taskkill", ["/F", "/PID", String(pid)], {
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    if (killed.status !== 0) {
+      fail("旧同屏进程无法自动关闭。请把日志发给 AI。");
+    }
+    await waitForPortFree(targetPort, 12_000);
+    console.log("旧同屏已清理，端口已释放。");
+    return;
+  }
+
+  if (await isPortOpen(targetPort)) {
+    fail(
+      "端口 " + targetPort +
+        " 被其他程序占用。启动器没有关闭它；请把日志发给 AI。",
+    );
+  }
+}
+
+async function waitForPortFree(targetPort, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!(await isPortOpen(targetPort))) return;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  fail("旧同屏退出后，端口 " + targetPort + " 仍未释放。请把日志发给 AI。");
+}
+
+function isPortOpen(targetPort) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({
+      host: "127.0.0.1",
+      port: Number(targetPort),
+    });
+    const done = (open) => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve(open);
+    };
+    socket.setTimeout(700);
+    socket.once("connect", () => done(true));
+    socket.once("timeout", () => done(false));
+    socket.once("error", () => done(false));
+  });
+}
 
 function startTongping(publicOrigin) {
   const child = spawn(process.execPath, [path.join(root, "scripts", "start.mjs")], {
