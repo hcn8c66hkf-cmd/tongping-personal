@@ -258,6 +258,8 @@ export function createTongpingMcpServer(
   const browserAppToolMeta: Record<string, unknown> = {
     "ui/resourceUri": BROWSER_APP_URI,
     "openai/outputTemplate": BROWSER_APP_URI,
+    // Legacy ChatGPT/iOS hosts still gate component boot on this alias.
+    "openai/widgetAccessible": true,
     ui: {
       resourceUri: BROWSER_APP_URI,
       visibility: ["model", "app"],
@@ -1841,21 +1843,32 @@ export function createTongpingMcpServer(
     },
   );
 
+  const appResourceDomains = [appOrigin, "https://cdn.jsdelivr.net"];
+  const appConnectDomains = [
+    appOrigin,
+    appWsOrigin,
+    "https://cdn.jsdelivr.net",
+    "https://storage.googleapis.com",
+  ];
   const uiMeta = {
     csp: {
       // jsdelivr / googleapis: MediaPipe face landmarker for the camera effects.
-      resourceDomains: [appOrigin, "https://cdn.jsdelivr.net"],
-      connectDomains: [
-        appOrigin,
-        appWsOrigin,
-        "https://cdn.jsdelivr.net",
-        "https://storage.googleapis.com",
-      ],
+      resourceDomains: appResourceDomains,
+      connectDomains: appConnectDomains,
     },
+    // ChatGPT iOS compatibility aliases. Keep these beside the standard
+    // ui.csp fields until every supported host reads the MCP Apps names.
+    "openai/widgetCSP": {
+      resource_domains: appResourceDomains,
+      connect_domains: appConnectDomains,
+    },
+    "openai/widgetPrefersBorder": false,
     // Hold-to-talk and 「让 TA 看看你」; hosts may decline, the card feature-detects.
     permissions: { microphone: {}, camera: {} },
     prefersBorder: false,
-    ...(appDomain ? { domain: appDomain } : {}),
+    ...(appDomain
+      ? { domain: appDomain, "openai/widgetDomain": appDomain }
+      : {}),
   };
   if (claudeHostSession) delete (uiMeta as Record<string, unknown>).domain;
 
