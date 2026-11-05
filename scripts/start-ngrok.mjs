@@ -124,7 +124,7 @@ if (!tongping) {
 
 console.log("固定公网地址：" + publicOrigin);
 console.log("ChatGPT / Claude 的 MCP 地址：" + publicOrigin + "/mcp");
-console.log("同屏和固定隧道均已就绪（启动器 v108）。");
+console.log("同屏和固定隧道均已就绪（启动器 v110）。");
 console.log("");
 
 async function clearStaleLocalTongping(targetPort, waitForHealthMs = 0) {
