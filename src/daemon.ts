@@ -2689,6 +2689,7 @@ const server = http.createServer(async (request, response) => {
       return sendJson(response, 200, {
         ok: true,
         service: "tongping",
+        startupId: process.env.TONGPING_STARTUP_ID?.trim() || null,
         version: PACKAGE_VERSION,
         mcp: "/mcp",
         live: "/live",
