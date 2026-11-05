@@ -19,9 +19,11 @@ const envFile = path.join(root, ".env");
 const env = readEnvFile(envFile);
 const port = env.TONGPING_PORT?.trim() || "45921";
 const bundledNgrok = path.join(root, "ngrok.exe");
-const ngrokCommand = process.platform === "win32" && existsSync(bundledNgrok)
-  ? bundledNgrok
-  : "ngrok";
+const ngrokCommand =
+  process.env.TONGPING_NGROK_BIN?.trim() ||
+  (process.platform === "win32" && existsSync(bundledNgrok)
+    ? bundledNgrok
+    : "ngrok");
 
 const version = spawnSync(ngrokCommand, ["version"], {
   encoding: "utf8",
