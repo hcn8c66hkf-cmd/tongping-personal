@@ -46,6 +46,14 @@ import {
 
 const BROWSER_APP_MIME_TYPE = "text/html;profile=mcp-app";
 
+// ChatGPT can keep a tool descriptor from when the connector was installed.
+// Keep every recent resource URI resolvable so a cached descriptor loads the
+// current renderer instead of failing before the component can boot.
+export const RECENT_BROWSER_APP_COMPAT_URIS = Array.from(
+  { length: 110 - 24 },
+  (_, index) => `ui://tongping/shared-browser-v${109 - index}`,
+);
+
 export function buildBrowserAppResourceMeta(
   appOrigin: string,
   appWsOrigin: string,
@@ -1943,53 +1951,7 @@ export function createTongpingMcpServer(
     }),
   );
 
-  for (const recentCompatUri of [
-    "ui://tongping/shared-browser-v72",
-    "ui://tongping/shared-browser-v71",
-    "ui://tongping/shared-browser-v70",
-    "ui://tongping/shared-browser-v69",
-    "ui://tongping/shared-browser-v68",
-    "ui://tongping/shared-browser-v67",
-    "ui://tongping/shared-browser-v66",
-    "ui://tongping/shared-browser-v65",
-    "ui://tongping/shared-browser-v64",
-    "ui://tongping/shared-browser-v63",
-    "ui://tongping/shared-browser-v62",
-    "ui://tongping/shared-browser-v61",
-    "ui://tongping/shared-browser-v60",
-    "ui://tongping/shared-browser-v59",
-    "ui://tongping/shared-browser-v58",
-    "ui://tongping/shared-browser-v57",
-    "ui://tongping/shared-browser-v56",
-    "ui://tongping/shared-browser-v55",
-    "ui://tongping/shared-browser-v54",
-    "ui://tongping/shared-browser-v53",
-    "ui://tongping/shared-browser-v52",
-    "ui://tongping/shared-browser-v51",
-    "ui://tongping/shared-browser-v50",
-    "ui://tongping/shared-browser-v49",
-    "ui://tongping/shared-browser-v48",
-    "ui://tongping/shared-browser-v47",
-    "ui://tongping/shared-browser-v46",
-    "ui://tongping/shared-browser-v45",
-    "ui://tongping/shared-browser-v44",
-    "ui://tongping/shared-browser-v43",
-    "ui://tongping/shared-browser-v42",
-    "ui://tongping/shared-browser-v41",
-    "ui://tongping/shared-browser-v40",
-    "ui://tongping/shared-browser-v39",
-    "ui://tongping/shared-browser-v38",
-    "ui://tongping/shared-browser-v37",
-    "ui://tongping/shared-browser-v36",
-    "ui://tongping/shared-browser-v35",
-    "ui://tongping/shared-browser-v30",
-    "ui://tongping/shared-browser-v29",
-    "ui://tongping/shared-browser-v28",
-    "ui://tongping/shared-browser-v27",
-    "ui://tongping/shared-browser-v26",
-    "ui://tongping/shared-browser-v25",
-    "ui://tongping/shared-browser-v24",
-  ]) {
+  for (const recentCompatUri of RECENT_BROWSER_APP_COMPAT_URIS) {
     registerBrowserAppResource(
       "同屏 recent compatibility " + recentCompatUri,
       recentCompatUri,
