@@ -33,6 +33,22 @@ if (version.status !== 0) {
   );
 }
 
+let ngrok = null;
+let tongping = null;
+let stopping = false;
+let restartingTongping = false;
+
+process.on("SIGINT", () => stopAll(0));
+process.on("SIGTERM", () => stopAll(0));
+
+const configuredPublicOrigin = normalizeOrigin(env.TONGPING_PUBLIC_ORIGIN);
+if (configuredPublicOrigin) {
+  console.log("正在先启动本地同屏……");
+  tongping = startTongping(configuredPublicOrigin);
+  await waitForTongping(port, tongping);
+  console.log("本地同屏已就绪，正在开放固定隧道……");
+}
+
 let existing = await findNgrokTunnel(port).catch(() => null);
 if (existing && await endpointIsOffline(existing)) {
   console.log("发现已失效的 ngrok 残留进程，正在自动清理……");
@@ -45,7 +61,6 @@ if (existing && await endpointIsOffline(existing)) {
   }
   existing = null;
 }
-let ngrok = null;
 let publicOrigin = existing;
 
 if (publicOrigin) {
@@ -69,45 +84,86 @@ if (publicOrigin) {
   );
   pipeWithPrefix(ngrok.stdout, "[ngrok] ", process.stdout);
   pipeWithPrefix(ngrok.stderr, "[ngrok] ", process.stderr);
-  publicOrigin = await waitForNgrok(port, ngrok);
-}
-
-writePublicOrigin(envFile, publicOrigin);
-console.log("固定公网地址：" + publicOrigin);
-console.log("ChatGPT / Claude 的 MCP 地址：" + publicOrigin + "/mcp");
-console.log("正在启动同屏……");
-console.log("");
-
-const tongping = spawn(process.execPath, [path.join(root, "scripts", "start.mjs")], {
-  cwd: root,
-  env: {
-    ...process.env,
-    TONGPING_PUBLIC_ORIGIN: publicOrigin,
-  },
-  stdio: "inherit",
-  windowsHide: false,
-});
-
-let stopping = false;
-process.on("SIGINT", () => stopAll(0));
-process.on("SIGTERM", () => stopAll(0));
-
-tongping.on("exit", (code) => {
-  if (!stopping) stopAll(code || 0);
-});
-if (ngrok) {
   ngrok.on("exit", (code) => {
     if (!stopping) {
       console.error("ngrok 已退出（code=" + (code ?? "-") + "），同屏一起停止。");
       stopAll(code || 1);
     }
   });
+  publicOrigin = await waitForNgrok(port, ngrok);
+}
+
+writePublicOrigin(envFile, publicOrigin);
+
+if (tongping && configuredPublicOrigin !== publicOrigin) {
+  console.log("固定公网地址发生变化，正在用正确地址重启本地同屏……");
+  restartingTongping = true;
+  await stopChild(tongping);
+  restartingTongping = false;
+  tongping = startTongping(publicOrigin);
+}
+if (!tongping) {
+  console.log("正在启动同屏……");
+  tongping = startTongping(publicOrigin);
+}
+await waitForTongping(port, tongping);
+
+console.log("固定公网地址：" + publicOrigin);
+console.log("ChatGPT / Claude 的 MCP 地址：" + publicOrigin + "/mcp");
+console.log("同屏和固定隧道均已就绪。");
+console.log("");
+
+function startTongping(publicOrigin) {
+  const child = spawn(process.execPath, [path.join(root, "scripts", "start.mjs")], {
+    cwd: root,
+    env: {
+      ...process.env,
+      TONGPING_PUBLIC_ORIGIN: publicOrigin,
+    },
+    stdio: "inherit",
+    windowsHide: false,
+  });
+  child.on("exit", (code) => {
+    if (!stopping && !restartingTongping) stopAll(code || 1);
+  });
+  return child;
+}
+
+async function waitForTongping(targetPort, child) {
+  const origin = "http://127.0.0.1:" + targetPort;
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) {
+      fail("本地同屏没有启动成功。请查看上面的 [daemon] / [worker] 日志。");
+    }
+    try {
+      const response = await fetch(origin + "/health", {
+        signal: AbortSignal.timeout(2_000),
+      });
+      if (response.ok) {
+        const health = await response.json().catch(() => null);
+        if (health?.service === "tongping") return;
+      }
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 350));
+  }
+  fail("60 秒内本地同屏没有通过健康检查。请把上面的日志发给 AI。");
+}
+
+async function stopChild(child) {
+  if (!child || child.exitCode !== null) return;
+  child.kill("SIGTERM");
+  await Promise.race([
+    new Promise((resolve) => child.once("exit", resolve)),
+    new Promise((resolve) => setTimeout(resolve, 4_000)),
+  ]);
+  if (child.exitCode === null) child.kill("SIGKILL");
 }
 
 function stopAll(code) {
   if (stopping) return;
   stopping = true;
-  if (tongping.exitCode === null) tongping.kill("SIGTERM");
+  if (tongping && tongping.exitCode === null) tongping.kill("SIGTERM");
   if (ngrok && ngrok.exitCode === null) ngrok.kill("SIGTERM");
   setTimeout(() => process.exit(code), 4_000).unref();
   const running = [tongping, ngrok].filter(
@@ -118,6 +174,14 @@ function stopAll(code) {
       (child) => new Promise((resolve) => child.once("exit", resolve)),
     ),
   ).then(() => process.exit(code));
+}
+
+function normalizeOrigin(value) {
+  try {
+    return value ? new URL(value).origin : "";
+  } catch {
+    return "";
+  }
 }
 
 async function waitForNgrok(targetPort, child) {
