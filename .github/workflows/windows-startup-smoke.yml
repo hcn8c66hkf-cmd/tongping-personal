@@ -115,7 +115,7 @@ jobs:
           import json
           import time
 
-          time.sleep(0.10)
+          time.sleep(0.30)
 
           class LateTongPing(http.server.BaseHTTPRequestHandler):
               def do_GET(self):
@@ -138,6 +138,7 @@ jobs:
           $stale = Start-Process -FilePath python -ArgumentList "late_tongping.py" -PassThru -NoNewWindow
 
           $env:TONGPING_NGROK_BIN = "python"
+          $env:TONGPING_TEST_PAUSE_AFTER_PREFLIGHT_MS = "800"
           $stdout = Join-Path $env:RUNNER_TEMP "one-click-out.log"
           $stderr = Join-Path $env:RUNNER_TEMP "one-click-err.log"
           $process = Start-Process -FilePath node -ArgumentList "scripts/start-ngrok.mjs" -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
