@@ -1,0 +1,54 @@
+name: windows-startup-smoke
+
+on:
+  push:
+    branches:
+      - windows-startup-diagnosis-v106-20261105
+  workflow_dispatch:
+
+jobs:
+  start-local-stack:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Start TongPing and verify health
+        shell: pwsh
+        run: |
+          $env:TONGPING_HOME = Join-Path $env:RUNNER_TEMP "tongping-smoke"
+          $env:TONGPING_PORT = "45921"
+          $env:TONGPING_HEADLESS = "1"
+          $stdout = Join-Path $env:RUNNER_TEMP "tongping-out.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "tongping-err.log"
+          $process = Start-Process -FilePath node -ArgumentList "scripts/start.mjs" -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          try {
+            $healthy = $false
+            for ($i = 0; $i -lt 60; $i++) {
+              if ($process.HasExited) { break }
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:45921/health" -TimeoutSec 2
+                if ($health.service -eq "tongping") {
+                  $healthy = $true
+                  break
+                }
+              } catch {}
+              Start-Sleep -Milliseconds 500
+            }
+            Get-Content $stdout -ErrorAction SilentlyContinue
+            Get-Content $stderr -ErrorAction SilentlyContinue
+            if (-not $healthy) {
+              throw "TongPing did not become healthy on Windows"
+            }
+          } finally {
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+            Get-CimInstance Win32_Process |
+              Where-Object { $_.CommandLine -like "*$env:TONGPING_HOME*" -or $_.CommandLine -like "*scripts/start.mjs*" } |
+              ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+          }
