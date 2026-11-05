@@ -47,6 +47,12 @@ process.on("SIGTERM", () => stopAll(0));
 
 const configuredPublicOrigin = normalizeOrigin(env.TONGPING_PUBLIC_ORIGIN);
 await clearStaleLocalTongping(port, 0);
+const testPauseAfterPreflight = Number(
+  process.env.TONGPING_TEST_PAUSE_AFTER_PREFLIGHT_MS || "0",
+);
+if (Number.isFinite(testPauseAfterPreflight) && testPauseAfterPreflight > 0) {
+  await new Promise((resolve) => setTimeout(resolve, testPauseAfterPreflight));
+}
 if (configuredPublicOrigin) {
   console.log("正在先启动本地同屏……");
   tongping = await startTongpingReady(configuredPublicOrigin);
