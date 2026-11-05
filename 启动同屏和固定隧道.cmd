@@ -2,7 +2,7 @@
 chcp 65001 >nul
 setlocal EnableExtensions
 cd /d "%~dp0"
-title 同屏 TongPing + 固定隧道（启动器 v108）
+title 同屏 TongPing + 固定隧道（启动器 v109）
 
 where node >nul 2>nul
 if errorlevel 1 (
@@ -52,8 +52,8 @@ if not exist ".env" (
 )
 
 echo.
-echo [启动器 v108] 正在启动固定隧道和同屏……以后只需要双击这一个文件。
-echo 这个窗口要一直开着；按 Ctrl+C 或关掉窗口会一起停止。
+echo [启动器 v109] 正在启动固定隧道和同屏……以后只需要双击这一个文件。
+echo 这个窗口要一直开着；关闭窗口时，同屏和隧道会一起停止。
 echo.
 node scripts\start-ngrok.mjs
 echo.
