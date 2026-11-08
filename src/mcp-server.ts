@@ -50,8 +50,8 @@ const BROWSER_APP_MIME_TYPE = "text/html;profile=mcp-app";
 // Keep every recent resource URI resolvable so a cached descriptor loads the
 // current renderer instead of failing before the component can boot.
 export const RECENT_BROWSER_APP_COMPAT_URIS = Array.from(
-  { length: 110 - 24 },
-  (_, index) => `ui://tongping/shared-browser-v${109 - index}`,
+  { length: 112 - 24 },
+  (_, index) => `ui://tongping/shared-browser-v${111 - index}`,
 );
 
 export function buildBrowserAppResourceMeta(
