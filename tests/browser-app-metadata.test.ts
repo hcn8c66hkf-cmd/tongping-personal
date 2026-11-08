@@ -64,7 +64,7 @@ test("non-ChatGPT hosts receive only standard MCP Apps UI metadata", () => {
 });
 
 test("cached ChatGPT tool descriptors from recent app builds still resolve", () => {
-  assert.equal(RECENT_BROWSER_APP_COMPAT_URIS[0], "ui://tongping/shared-browser-v109");
+  assert.equal(RECENT_BROWSER_APP_COMPAT_URIS[0], "ui://tongping/shared-browser-v111");
   assert.ok(RECENT_BROWSER_APP_COMPAT_URIS.includes("ui://tongping/shared-browser-v105"));
   assert.ok(RECENT_BROWSER_APP_COMPAT_URIS.includes("ui://tongping/shared-browser-v73"));
   assert.ok(RECENT_BROWSER_APP_COMPAT_URIS.includes("ui://tongping/shared-browser-v72"));
@@ -72,5 +72,5 @@ test("cached ChatGPT tool descriptors from recent app builds still resolve", () 
     RECENT_BROWSER_APP_COMPAT_URIS.at(-1),
     "ui://tongping/shared-browser-v24",
   );
-  assert.equal(RECENT_BROWSER_APP_COMPAT_URIS.includes("ui://tongping/shared-browser-v111"), false);
+  assert.equal(RECENT_BROWSER_APP_COMPAT_URIS.includes("ui://tongping/shared-browser-v112"), false);
 });
