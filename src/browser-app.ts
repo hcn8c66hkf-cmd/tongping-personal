@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-export const BROWSER_APP_URI = "ui://tongping/shared-browser-v111";
+export const BROWSER_APP_URI = "ui://tongping/shared-browser-v112";
 
 // Keep the MCP Apps bridge inside the component HTML. A second module request
 // could be blocked or time out in the ChatGPT iOS component sandbox, leaving
@@ -3220,6 +3220,12 @@ async function probeCompanionPlaylist() {
       { cache: "no-store" }
     );
     const text = response.ok ? await response.text() : "";
+    if (!response.ok) {
+      throw new Error("HLS 清单 HTTP " + response.status);
+    }
+    if (text.indexOf("#EXTM3U") < 0) {
+      throw new Error("HLS 清单返回了非播放内容");
+    }
     const streamMatch = text.match(
       /#TONGPING-STREAM-ID:([^\\r\\n]+)/
     );
@@ -3321,7 +3327,16 @@ async function probeCompanionPlaylist() {
       scheduleCompanionProbe(companionVideoStarted ? 1500 : 900);
       return;
     }
-  } catch {}
+  } catch (error) {
+    const detail = error && error.message
+      ? error.message
+      : String(error || "未知错误");
+    setNudgeStatus("陪看清单读取失败 · " + detail);
+    if (!companionVideoStarted) {
+      $("companionPrepTitle").textContent = "缓存清单没有接进来";
+      $("companionPrepText").textContent = detail + "；可以先回到 LIVE。";
+    }
+  }
 
   if (companionModeActive) {
     scheduleCompanionProbe(companionVideoStarted ? 1500 : 1200);
@@ -3450,7 +3465,10 @@ function loadCompanionVideoSource(video, sourceUrl) {
   );
   if (!nativeHls && typeof Hls !== "undefined" && Hls.isSupported()) {
     const player = new Hls({
-      enableWorker: true,
+      // ChatGPT components run under a strict iframe CSP. hls.js normally
+      // creates a blob: Worker, which some hosts reject. Keep transmuxing on
+      // the component thread for sandbox compatibility.
+      enableWorker: false,
       lowLatencyMode: false,
       backBufferLength: 30,
       maxBufferLength: 90
