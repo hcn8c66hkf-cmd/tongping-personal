@@ -83,6 +83,9 @@ test("browser app inlines the official MCP Apps bridge without daemon credential
   assert.doesNotMatch(html, /fetch\(state\.inputUrl/);
   assert.match(html, /state\.liveUrl/);
   assert.match(html, /new WebSocket\(withCardStamp\(state\.liveUrl\)\)/);
+  assert.match(html, /enableWorker: false/);
+  assert.match(html, /HLS 清单 HTTP/);
+  assert.match(html, /HLS 清单返回了非播放内容/);
   assert.match(html, /binaryType = "arraybuffer"/);
   assert.match(html, /new Uint8Array\(buffer, 20\)/);
   assert.match(html, /new Blob\(\[jpeg\], \{ type: "image\/jpeg" \}\)/);
