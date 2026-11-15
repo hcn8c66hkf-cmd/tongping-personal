@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-export const BROWSER_APP_URI = "ui://tongping/shared-browser-v112";
+export const BROWSER_APP_URI = "ui://tongping/shared-browser-v113";
 
 // Keep the MCP Apps bridge inside the component HTML. A second module request
 // could be blocked or time out in the ChatGPT iOS component sandbox, leaving
@@ -3217,7 +3217,14 @@ async function probeCompanionPlaylist() {
     const url = companionPlaylistUrl();
     const response = await fetch(
       url + (url.includes("?") ? "&" : "?") + "_probe=" + Date.now(),
-      { cache: "no-store" }
+      {
+        cache: "no-store",
+        // Free ngrok HTTP endpoints inject a browser-warning response unless
+        // the client opts out. That response is generated before our daemon,
+        // so it has none of the daemon's CORS headers and surfaces here only
+        // as TypeError: Failed to fetch inside the ChatGPT component.
+        headers: { "ngrok-skip-browser-warning": "tongping" }
+      }
     );
     const text = response.ok ? await response.text() : "";
     if (!response.ok) {
@@ -3471,7 +3478,13 @@ function loadCompanionVideoSource(video, sourceUrl) {
       enableWorker: false,
       lowLatencyMode: false,
       backBufferLength: 30,
-      maxBufferLength: 90
+      maxBufferLength: 90,
+      // Apply the ngrok warning bypass to both the playlist and every media
+      // segment loaded by hls.js. The daemon explicitly permits this header
+      // in the companion CORS preflight response.
+      xhrSetup: (xhr) => {
+        xhr.setRequestHeader("ngrok-skip-browser-warning", "tongping");
+      }
     });
     companionHlsPlayer = player;
     player.on(Hls.Events.MEDIA_ATTACHED, () => {

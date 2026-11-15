@@ -2531,6 +2531,21 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (
+      request.method === "OPTIONS" &&
+      (url.pathname === "/v1/app/companion-hls" ||
+        url.pathname === "/v1/app/companion-file")
+    ) {
+      response.writeHead(204, {
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, OPTIONS",
+        "access-control-allow-headers": "ngrok-skip-browser-warning",
+        "access-control-max-age": "600",
+      });
+      response.end();
+      return;
+    }
+
+    if (
       request.method === "GET" &&
       url.pathname === "/v1/app/companion-hls"
     ) {
