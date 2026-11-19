@@ -1,0 +1,47 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const launcher = await readFile(
+  new URL("../scripts/Start-OpenAI-Tunnel.ps1", import.meta.url),
+  "utf8",
+);
+const commandFile = await readFile(
+  new URL("../启动同屏和固定隧道.cmd", import.meta.url),
+  "utf8",
+);
+
+test("v114 uses its dedicated OpenAI tunnel and never the other private tunnels", () => {
+  assert.match(launcher, /tunnel_6afec118b3c4819190be0edaecf8df78/);
+  assert.doesNotMatch(launcher, /tunnel_6ae9f1efa5708191949296c5a912f8d5/);
+  assert.doesNotMatch(launcher, /tunnel_6a7b2f25e72c8191a5d247f5ca4db9f6/);
+  assert.doesNotMatch(launcher, /tunnel_6aeb2db0519081919de5b004e1f5e4f4/);
+});
+
+test("v114 keeps secrets local and injects daemon authorization only on the localhost hop", () => {
+  assert.match(launcher, /control-plane-key\.dpapi/);
+  assert.match(launcher, /MCP_EXTRA_HEADERS/);
+  assert.match(launcher, /Authorization: Bearer/);
+  assert.match(launcher, /Join-Path \$TongPingHome 'daemon\\daemon-token'/);
+  assert.doesNotMatch(launcher, /sk-[A-Za-z0-9_-]{20,}/);
+  assert.match(launcher, /Get-DotEnvValue 'TONGPING_PORT'/);
+  assert.match(launcher, /Get-DotEnvValue 'TONGPING_HOME'/);
+});
+
+test("v114 command launcher no longer requires or starts ngrok", () => {
+  assert.match(commandFile, /Start-OpenAI-Tunnel\.ps1/);
+  assert.doesNotMatch(commandFile, /start-ngrok|NGROK_BIN|ngrok\.exe/i);
+});
+
+test("v114 refuses to kill a reused stale PID", () => {
+  assert.match(launcher, /Get-CimInstance Win32_Process/);
+  assert.match(launcher, /Ignored stale PID file/);
+  assert.match(launcher, /ExpectedCommandFragment/);
+});
+
+test("v114 uses an ephemeral media relay without binding the plugin to it", () => {
+  assert.ok(launcher.includes("trycloudflare"));
+  assert.match(launcher, /TONGPING_PUBLIC_ORIGIN/);
+  assert.match(launcher, /--mcp-server-url/);
+  assert.match(launcher, /http:\/\/127\.0\.0\.1:/);
+});

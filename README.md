@@ -20,9 +20,10 @@
 ## 30 秒看懂架构
 
 ```
- claude.ai / ChatGPT ──HTTPS 隧道──┐
- Claude Code / Codex ──本机──────┐ │
-                                 ▼ ▼
+ ChatGPT ──OpenAI Secure MCP Tunnel──┐
+ claude.ai ──公网 HTTPS 隧道─────────┤
+ Claude Code / Codex ──本机─────────┤
+                                    ▼
                      ┌──────── daemon（端口 45921）────────┐
                      │ MCP 服务 · 卡片 · 群聊 · OAuth 登录  │
                      └───────────────┬──────────────────────┘
@@ -77,6 +78,7 @@ npm run doctor
 | 命令 | 作用 |
 |---|---|
 | `npm run up` | 启动同屏（daemon + worker），Ctrl+C 停止 |
+| `npm run up:openai-tunnel` | Windows：启动同屏 + ChatGPT 固定私有隧道 |
 | `npm run selftest` | 端到端自检：网页、视频、实时画面、群聊 |
 | `npm run doctor` | 体检 + 诊断摘要（只读，不改任何东西） |
 | `npm run asr:install` | 安装本地字幕（语音识别）。国内网络加 `-- --cn` |

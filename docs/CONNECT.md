@@ -67,7 +67,23 @@ codex mcp add tongping --url http://127.0.0.1:45921/mcp --bearer-token-env-var T
 
 Claude Desktop 和 Claude 手机 App 用的是同一个账号的连接器，网页上加好后它们会自动同步，不需要另外配置。
 
-## ChatGPT（网页 / 手机 App）
+## ChatGPT（网页 / 手机 App，推荐固定私有隧道）
+
+Windows 直接双击 `启动同屏和固定隧道.cmd`。v114 以后，MCP 使用 OpenAI Secure MCP Tunnel；卡片画面使用免费、无需账号的短期媒体中继。后者地址每次启动可以变化，但不会改变插件连接，因此不再删除重加。
+
+固定 Tunnel ID：`tunnel_6afec118b3c4819190be0edaecf8df78`。
+
+第一次创建插件时：
+
+1. 保持启动器窗口显示 `READY`。
+2. ChatGPT → Plugins → Add → **Add custom MCP server**。
+3. Connection 选择 **Tunnel**，选择 `tongping-personal`（或填上面的 Tunnel ID）。
+4. Authentication 选择 **No authentication**；本机 daemon 令牌只由 tunnel-client 在最后一跳注入，不会暴露给卡片。
+5. 创建并安装。以后升级或重启只需双击启动器，不要删插件。
+
+如果电脑上已经运行过「哥哥的微信 · 固定隧道」，启动器会在同一 Windows 账户下复用它已用 DPAPI 加密保存的 OpenAI runtime key；否则只在本机窗口隐藏输入一次。
+
+### 旧的公网 URL 接法
 
 同样先完成隧道配置。
 
