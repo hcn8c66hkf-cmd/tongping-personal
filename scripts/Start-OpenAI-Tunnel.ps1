@@ -153,20 +153,21 @@ function Stop-ExistingTongPing {
         if ($parentId -le 0) { break }
         $parent = Get-ProcessById $parentId
         if ($null -eq $parent) { break }
-        if (Test-CommandLineFragment $parent '(?i)(?:^|[\\/])scripts[\\/]start\.mjs(?:\s|"|$)') {
+        if (Test-CommandLineFragment $parent '(?i)(?:^|[\s"\\/])scripts[\\/]start\.mjs(?:\s|"|$)') {
             $rootProcess = $parent
             break
         }
         $cursor = $parent
     }
 
-    Write-Step ('Stopping the previous TongPing instance safely (PID ' + [int]$rootProcess.ProcessId + ')...')
-    & taskkill.exe /PID ([int]$rootProcess.ProcessId) /T /F *> $null
+    $rootPid = [int]$rootProcess.ProcessId
+    Write-Step ('Stopping the previous TongPing instance safely (PID ' + $rootPid + ')...')
+    & taskkill.exe /PID $rootPid /T /F *> $null
     $deadline = [DateTime]::UtcNow.AddSeconds(12)
-    while ([DateTime]::UtcNow -lt $deadline -and $null -ne (Get-ProcessById $lockPid)) {
+    while ([DateTime]::UtcNow -lt $deadline -and ($null -ne (Get-ProcessById $lockPid) -or $null -ne (Get-ProcessById $rootPid))) {
         Start-Sleep -Milliseconds 250
     }
-    if ($null -ne (Get-ProcessById $lockPid)) {
+    if ($null -ne (Get-ProcessById $lockPid) -or $null -ne (Get-ProcessById $rootPid)) {
         throw 'The previous TongPing daemon did not stop. Restart Windows once, then use this launcher again.'
     }
     Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
