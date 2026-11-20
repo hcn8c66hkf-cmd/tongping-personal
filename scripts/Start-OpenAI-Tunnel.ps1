@@ -22,6 +22,7 @@ $CloudflaredPidFile = Join-Path $DataDir 'cloudflared.pid'
 $WslExe = $null
 $TongPingProcess = $null
 $CloudflaredProcess = $null
+$PortReservation = $null
 
 function Get-DotEnvValue([string]$Name) {
     $processValue = [Environment]::GetEnvironmentVariable($Name, 'Process')
@@ -203,30 +204,46 @@ function Get-TcpListenerProcessIds([int]$Port) {
     return @($ids | Sort-Object -Unique)
 }
 
-function Find-FreeLocalPort([int]$StartPort) {
+function New-LocalPortReservation([int]$Port) {
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $Port)
+    try {
+        $listener.Server.ExclusiveAddressUse = $true
+        $listener.Start()
+        return $listener
+    }
+    catch {
+        $listener.Stop()
+        return $null
+    }
+}
+
+function Reserve-FreeLocalPort([int]$StartPort) {
     for ($offset = 1; $offset -le 200; $offset++) {
         $candidate = $StartPort + $offset
         if ($candidate -gt 65535) { break }
-        if (-not (Test-TcpPort $candidate)) { return $candidate }
+        $listener = New-LocalPortReservation $candidate
+        if ($null -ne $listener) {
+            return @{ Port = $candidate; Listener = $listener }
+        }
     }
     throw ('No free local port was found near ' + $StartPort + '.')
 }
 
 function Prepare-TongPingPort {
     $listenerIds = @(Get-TcpListenerProcessIds $script:TongPingPort)
-    $hasUnknownOwner = $false
     foreach ($listenerPid in $listenerIds) {
         $listenerProcess = Get-ProcessById ([int]$listenerPid)
         if ($null -eq $listenerProcess) { continue }
-        if (-not (Stop-VerifiedTongPingProcessTree $listenerProcess 'Stopping another TongPing process on the configured port')) {
-            $hasUnknownOwner = $true
-        }
+        [void](Stop-VerifiedTongPingProcessTree $listenerProcess 'Stopping another TongPing process on the configured port')
     }
 
-    if ($hasUnknownOwner -or (Test-TcpPort $script:TongPingPort)) {
+    $script:PortReservation = New-LocalPortReservation $script:TongPingPort
+    if ($null -eq $script:PortReservation) {
         $oldPort = $script:TongPingPort
-        $script:TongPingPort = Find-FreeLocalPort $oldPort
-        Write-Step ('Local port ' + $oldPort + ' belongs to another app; using free port ' + $script:TongPingPort + ' for this run.')
+        $reserved = Reserve-FreeLocalPort $oldPort
+        $script:TongPingPort = [int]$reserved.Port
+        $script:PortReservation = $reserved.Listener
+        Write-Step ('Local port ' + $oldPort + ' cannot be reserved; using and reserving free port ' + $script:TongPingPort + ' for this run.')
     }
     [Environment]::SetEnvironmentVariable('TONGPING_PORT', [string]$script:TongPingPort, 'Process')
 }
@@ -388,6 +405,9 @@ function Start-QuickTunnel {
 
 function Start-TongPing([string]$PublicOrigin) {
     Stop-ProcessTreeFromFile $TongPingPidFile 'scripts\start.mjs'
+    if ($null -eq $script:PortReservation) { throw 'TongPing local port was not reserved before startup.' }
+    $script:PortReservation.Stop()
+    $script:PortReservation = $null
     $oldPublicOrigin = [Environment]::GetEnvironmentVariable('TONGPING_PUBLIC_ORIGIN', 'Process')
     try {
         [Environment]::SetEnvironmentVariable('TONGPING_PUBLIC_ORIGIN', $PublicOrigin, 'Process')
@@ -454,7 +474,7 @@ function Start-SecureTunnel([string]$RuntimeKey) {
 
 try {
     Write-Host ''
-    Write-Host 'TongPing + OpenAI Private Tunnel v116' -ForegroundColor Green
+    Write-Host 'TongPing + OpenAI Private Tunnel v117' -ForegroundColor Green
     Write-Host ('Tunnel: ' + $TunnelId)
     Write-Host ''
     New-Item -ItemType Directory -Path $DataDir, $BinDir, $ProfileDir, $LogDir -Force | Out-Null
@@ -493,6 +513,10 @@ catch {
     exit 1
 }
 finally {
+    if ($null -ne $script:PortReservation) {
+        $script:PortReservation.Stop()
+        $script:PortReservation = $null
+    }
     Stop-ManagedTunnel
     Stop-ProcessTreeFromFile $TongPingPidFile 'scripts\start.mjs'
     Stop-ProcessTreeFromFile $CloudflaredPidFile 'cloudflared.exe'
