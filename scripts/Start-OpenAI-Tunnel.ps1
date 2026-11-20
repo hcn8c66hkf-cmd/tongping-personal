@@ -118,6 +118,44 @@ function Test-CommandLineFragment([object]$Process, [string]$Pattern) {
     return ([string]$Process.CommandLine) -match $Pattern
 }
 
+function Get-TongPingRootProcess([object]$Process) {
+    if ($null -eq $Process) { return $null }
+    $isDaemon = Test-CommandLineFragment $Process '(?i)(?:^|[\s"\\/])src[\\/]daemon\.ts(?:\s|"|$)'
+    $isLauncher = Test-CommandLineFragment $Process '(?i)(?:^|[\s"\\/])scripts[\\/]start\.mjs(?:\s|"|$)'
+    if (-not $isDaemon -and -not $isLauncher) { return $null }
+
+    $rootProcess = $Process
+    $cursor = $Process
+    for ($depth = 0; $depth -lt 6; $depth++) {
+        $parentId = [int]$cursor.ParentProcessId
+        if ($parentId -le 0) { break }
+        $parent = Get-ProcessById $parentId
+        if ($null -eq $parent) { break }
+        if (Test-CommandLineFragment $parent '(?i)(?:^|[\s"\\/])scripts[\\/]start\.mjs(?:\s|"|$)') {
+            return $parent
+        }
+        $cursor = $parent
+    }
+    return $rootProcess
+}
+
+function Stop-VerifiedTongPingProcessTree([object]$Process, [string]$Reason) {
+    $rootProcess = Get-TongPingRootProcess $Process
+    if ($null -eq $rootProcess) { return $false }
+    $targetPid = [int]$Process.ProcessId
+    $rootPid = [int]$rootProcess.ProcessId
+    Write-Step ($Reason + ' (PID ' + $rootPid + ')...')
+    & taskkill.exe /PID $rootPid /T /F *> $null
+    $deadline = [DateTime]::UtcNow.AddSeconds(12)
+    while ([DateTime]::UtcNow -lt $deadline -and ($null -ne (Get-ProcessById $targetPid) -or $null -ne (Get-ProcessById $rootPid))) {
+        Start-Sleep -Milliseconds 250
+    }
+    if ($null -ne (Get-ProcessById $targetPid) -or $null -ne (Get-ProcessById $rootPid)) {
+        throw 'A previous TongPing process did not stop. Restart Windows once, then use this launcher again.'
+    }
+    return $true
+}
+
 function Stop-ExistingTongPing {
     $lockPath = Join-Path $TongPingHome 'daemon\daemon.lock'
     if (-not (Test-Path -LiteralPath $lockPath)) { return }
@@ -142,35 +180,55 @@ function Stop-ExistingTongPing {
         return
     }
 
-    if (-not (Test-CommandLineFragment $daemonProcess '(?i)(?:^|[\\/])src[\\/]daemon\.ts(?:\s|"|$)')) {
+    if ($null -eq (Get-TongPingRootProcess $daemonProcess)) {
         throw ('The daemon lock points to live process ' + $lockPid + ', but it is not recognizable as TongPing. Close the old TongPing window or restart Windows; the launcher will not kill an unrelated process.')
     }
-
-    $rootProcess = $daemonProcess
-    $cursor = $daemonProcess
-    for ($depth = 0; $depth -lt 6; $depth++) {
-        $parentId = [int]$cursor.ParentProcessId
-        if ($parentId -le 0) { break }
-        $parent = Get-ProcessById $parentId
-        if ($null -eq $parent) { break }
-        if (Test-CommandLineFragment $parent '(?i)(?:^|[\s"\\/])scripts[\\/]start\.mjs(?:\s|"|$)') {
-            $rootProcess = $parent
-            break
-        }
-        $cursor = $parent
-    }
-
-    $rootPid = [int]$rootProcess.ProcessId
-    Write-Step ('Stopping the previous TongPing instance safely (PID ' + $rootPid + ')...')
-    & taskkill.exe /PID $rootPid /T /F *> $null
-    $deadline = [DateTime]::UtcNow.AddSeconds(12)
-    while ([DateTime]::UtcNow -lt $deadline -and ($null -ne (Get-ProcessById $lockPid) -or $null -ne (Get-ProcessById $rootPid))) {
-        Start-Sleep -Milliseconds 250
-    }
-    if ($null -ne (Get-ProcessById $lockPid) -or $null -ne (Get-ProcessById $rootPid)) {
-        throw 'The previous TongPing daemon did not stop. Restart Windows once, then use this launcher again.'
-    }
+    [void](Stop-VerifiedTongPingProcessTree $daemonProcess 'Stopping the previous TongPing instance safely')
     Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
+}
+
+function Get-TcpListenerProcessIds([int]$Port) {
+    $ids = @()
+    if (Get-Command 'Get-NetTCPConnection' -ErrorAction SilentlyContinue) {
+        $ids = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty OwningProcess -Unique)
+    }
+    if ($ids.Count -eq 0) {
+        foreach ($line in @(& netstat.exe -ano -p tcp 2>$null)) {
+            if ([string]$line -match ('^\s*TCP\s+\S+:' + $Port + '\s+\S+\s+LISTENING\s+(\d+)\s*$')) {
+                $ids += [int]$Matches[1]
+            }
+        }
+    }
+    return @($ids | Sort-Object -Unique)
+}
+
+function Find-FreeLocalPort([int]$StartPort) {
+    for ($offset = 1; $offset -le 200; $offset++) {
+        $candidate = $StartPort + $offset
+        if ($candidate -gt 65535) { break }
+        if (-not (Test-TcpPort $candidate)) { return $candidate }
+    }
+    throw ('No free local port was found near ' + $StartPort + '.')
+}
+
+function Prepare-TongPingPort {
+    $listenerIds = @(Get-TcpListenerProcessIds $script:TongPingPort)
+    $hasUnknownOwner = $false
+    foreach ($listenerPid in $listenerIds) {
+        $listenerProcess = Get-ProcessById ([int]$listenerPid)
+        if ($null -eq $listenerProcess) { continue }
+        if (-not (Stop-VerifiedTongPingProcessTree $listenerProcess 'Stopping another TongPing process on the configured port')) {
+            $hasUnknownOwner = $true
+        }
+    }
+
+    if ($hasUnknownOwner -or (Test-TcpPort $script:TongPingPort)) {
+        $oldPort = $script:TongPingPort
+        $script:TongPingPort = Find-FreeLocalPort $oldPort
+        Write-Step ('Local port ' + $oldPort + ' belongs to another app; using free port ' + $script:TongPingPort + ' for this run.')
+    }
+    [Environment]::SetEnvironmentVariable('TONGPING_PORT', [string]$script:TongPingPort, 'Process')
 }
 
 function Stop-ManagedTunnel {
@@ -329,7 +387,6 @@ function Start-QuickTunnel {
 }
 
 function Start-TongPing([string]$PublicOrigin) {
-    Stop-ExistingTongPing
     Stop-ProcessTreeFromFile $TongPingPidFile 'scripts\start.mjs'
     $oldPublicOrigin = [Environment]::GetEnvironmentVariable('TONGPING_PUBLIC_ORIGIN', 'Process')
     try {
@@ -397,7 +454,7 @@ function Start-SecureTunnel([string]$RuntimeKey) {
 
 try {
     Write-Host ''
-    Write-Host 'TongPing + OpenAI Private Tunnel v115' -ForegroundColor Green
+    Write-Host 'TongPing + OpenAI Private Tunnel v116' -ForegroundColor Green
     Write-Host ('Tunnel: ' + $TunnelId)
     Write-Host ''
     New-Item -ItemType Directory -Path $DataDir, $BinDir, $ProfileDir, $LogDir -Force | Out-Null
@@ -408,6 +465,8 @@ try {
     Install-TunnelClient
     Install-Cloudflared
     $runtimeKey = Get-ControlPlaneKey
+    Stop-ExistingTongPing
+    Prepare-TongPingPort
     Write-Step 'Starting the free short-lived media relay...'
     $publicOrigin = Start-QuickTunnel
     Write-Step ('Media relay ready: ' + $publicOrigin)
