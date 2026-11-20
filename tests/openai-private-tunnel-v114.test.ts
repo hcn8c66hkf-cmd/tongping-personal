@@ -31,7 +31,7 @@ test("v114 keeps secrets local and injects daemon authorization only on the loca
 test("v114 command launcher no longer requires or starts ngrok", () => {
   assert.match(commandFile, /Start-OpenAI-Tunnel\.ps1/);
   assert.doesNotMatch(commandFile, /start-ngrok|NGROK_BIN|ngrok\.exe/i);
-  assert.match(commandFile, /启动器 v115/);
+  assert.match(commandFile, /启动器 v116/);
 });
 
 test("v114 refuses to kill a reused stale PID", () => {
@@ -50,6 +50,16 @@ test("v115 safely replaces an older TongPing instance that owns the daemon lock"
   assert.ok(launcher.includes("will not kill an unrelated process"));
   assert.ok(launcher.includes("Get-ProcessById $rootPid"));
   assert.match(launcher, /function Start-TongPing[\s\S]*Stop-ExistingTongPing[\s\S]*Stop-ProcessTreeFromFile/);
+});
+
+test("v116 resolves a configured-port collision before starting the relay", () => {
+  assert.ok(launcher.includes("function Get-TcpListenerProcessIds"));
+  assert.ok(launcher.includes("Get-NetTCPConnection -State Listen"));
+  assert.ok(launcher.includes("function Stop-VerifiedTongPingProcessTree"));
+  assert.ok(launcher.includes("function Find-FreeLocalPort"));
+  assert.ok(launcher.includes("belongs to another app; using free port"));
+  assert.ok(launcher.includes("SetEnvironmentVariable('TONGPING_PORT'"));
+  assert.match(launcher, /Stop-ExistingTongPing\s+Prepare-TongPingPort\s+Write-Step 'Starting the free short-lived media relay/);
 });
 
 test("v114 uses an ephemeral media relay without binding the plugin to it", () => {
