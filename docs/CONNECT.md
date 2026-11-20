@@ -69,7 +69,7 @@ Claude Desktop 和 Claude 手机 App 用的是同一个账号的连接器，网�
 
 ## ChatGPT（网页 / 手机 App，推荐固定私有隧道）
 
-Windows 直接双击 `启动同屏和固定隧道.cmd`。v114 以后，MCP 使用 OpenAI Secure MCP Tunnel；卡片画面使用免费、无需账号的短期媒体中继。后者地址每次启动可以变化，但不会改变插件连接，因此不再删除重加。v115 起，启动器还会安全接管旧下载目录留下的 TongPing 实例，不需要手动找窗口或删除锁文件。
+Windows 直接双击 `启动同屏和固定隧道.cmd`。v114 以后，MCP 使用 OpenAI Secure MCP Tunnel；卡片画面使用免费、无需账号的短期媒体中继。后者地址每次启动可以变化，但不会改变插件连接，因此不再删除重加。v115 起，启动器还会安全接管旧下载目录留下的 TongPing 实例，不需要手动找窗口或删除锁文件；v116 会在配置端口仍被占用时核验并清理 TongPing 残留，若属于别的应用则自动换到空闲本机端口。
 
 固定 Tunnel ID：`tunnel_6afec118b3c4819190be0edaecf8df78`。
 
