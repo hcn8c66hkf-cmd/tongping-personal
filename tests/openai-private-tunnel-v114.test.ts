@@ -31,12 +31,23 @@ test("v114 keeps secrets local and injects daemon authorization only on the loca
 test("v114 command launcher no longer requires or starts ngrok", () => {
   assert.match(commandFile, /Start-OpenAI-Tunnel\.ps1/);
   assert.doesNotMatch(commandFile, /start-ngrok|NGROK_BIN|ngrok\.exe/i);
+  assert.match(commandFile, /启动器 v115/);
 });
 
 test("v114 refuses to kill a reused stale PID", () => {
   assert.match(launcher, /Get-CimInstance Win32_Process/);
   assert.match(launcher, /Ignored stale PID file/);
   assert.match(launcher, /ExpectedCommandFragment/);
+});
+
+test("v115 safely replaces an older TongPing instance that owns the daemon lock", () => {
+  assert.ok(launcher.includes("function Stop-ExistingTongPing"));
+  assert.ok(launcher.includes("'daemon\\daemon.lock'"));
+  assert.ok(launcher.includes("src[\\\\/]daemon\\.ts"));
+  assert.ok(launcher.includes("scripts[\\\\/]start\\.mjs"));
+  assert.ok(launcher.includes("Stopping the previous TongPing instance safely"));
+  assert.ok(launcher.includes("will not kill an unrelated process"));
+  assert.match(launcher, /function Start-TongPing[\s\S]*Stop-ExistingTongPing[\s\S]*Stop-ProcessTreeFromFile/);
 });
 
 test("v114 uses an ephemeral media relay without binding the plugin to it", () => {
