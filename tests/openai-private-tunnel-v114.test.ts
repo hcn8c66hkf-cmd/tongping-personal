@@ -31,7 +31,7 @@ test("v114 keeps secrets local and injects daemon authorization only on the loca
 test("v114 command launcher no longer requires or starts ngrok", () => {
   assert.match(commandFile, /Start-OpenAI-Tunnel\.ps1/);
   assert.doesNotMatch(commandFile, /start-ngrok|NGROK_BIN|ngrok\.exe/i);
-  assert.match(commandFile, /启动器 v116/);
+  assert.match(commandFile, /启动器 v117/);
 });
 
 test("v114 refuses to kill a reused stale PID", () => {
@@ -56,10 +56,20 @@ test("v116 resolves a configured-port collision before starting the relay", () =
   assert.ok(launcher.includes("function Get-TcpListenerProcessIds"));
   assert.ok(launcher.includes("Get-NetTCPConnection -State Listen"));
   assert.ok(launcher.includes("function Stop-VerifiedTongPingProcessTree"));
-  assert.ok(launcher.includes("function Find-FreeLocalPort"));
-  assert.ok(launcher.includes("belongs to another app; using free port"));
+  assert.ok(launcher.includes("function Reserve-FreeLocalPort"));
+  assert.ok(launcher.includes("cannot be reserved; using and reserving free port"));
   assert.ok(launcher.includes("SetEnvironmentVariable('TONGPING_PORT'"));
   assert.match(launcher, /Stop-ExistingTongPing\s+Prepare-TongPingPort\s+Write-Step 'Starting the free short-lived media relay/);
+});
+
+test("v117 reserves the selected port across relay startup and releases it only for Node", () => {
+  assert.ok(launcher.includes("function New-LocalPortReservation"));
+  assert.ok(launcher.includes("[Net.Sockets.TcpListener]::new"));
+  assert.ok(launcher.includes("ExclusiveAddressUse = $true"));
+  assert.ok(launcher.includes("function Reserve-FreeLocalPort"));
+  assert.ok(launcher.includes("using and reserving free port"));
+  assert.match(launcher, /function Start-TongPing[\s\S]*PortReservation\.Stop\(\)[\s\S]*Start-Process -FilePath 'node\.exe'/);
+  assert.match(launcher, /finally \{[\s\S]*PortReservation\.Stop\(\)[\s\S]*Stop-ManagedTunnel/);
 });
 
 test("v114 uses an ephemeral media relay without binding the plugin to it", () => {
