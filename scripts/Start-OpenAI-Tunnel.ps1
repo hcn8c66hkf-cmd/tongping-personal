@@ -109,6 +109,69 @@ function Stop-ProcessTreeFromFile([string]$PidFile, [string]$ExpectedCommandFrag
     & taskkill.exe /PID $pidValue /T /F *> $null
 }
 
+function Get-ProcessById([int]$ProcessId) {
+    return Get-CimInstance Win32_Process -Filter ("ProcessId = " + $ProcessId) -ErrorAction SilentlyContinue
+}
+
+function Test-CommandLineFragment([object]$Process, [string]$Pattern) {
+    if ($null -eq $Process) { return $false }
+    return ([string]$Process.CommandLine) -match $Pattern
+}
+
+function Stop-ExistingTongPing {
+    $lockPath = Join-Path $TongPingHome 'daemon\daemon.lock'
+    if (-not (Test-Path -LiteralPath $lockPath)) { return }
+
+    $lockPid = 0
+    try {
+        $lock = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json
+        if ($null -ne $lock.pid) { [void][int]::TryParse([string]$lock.pid, [ref]$lockPid) }
+    }
+    catch { }
+
+    if ($lockPid -le 0) {
+        Write-Step 'Removing an invalid stale TongPing daemon lock.'
+        Remove-Item -LiteralPath $lockPath -Force
+        return
+    }
+
+    $daemonProcess = Get-ProcessById $lockPid
+    if ($null -eq $daemonProcess) {
+        Write-Step 'Removing a stale TongPing daemon lock.'
+        Remove-Item -LiteralPath $lockPath -Force
+        return
+    }
+
+    if (-not (Test-CommandLineFragment $daemonProcess '(?i)(?:^|[\\/])src[\\/]daemon\.ts(?:\s|"|$)')) {
+        throw ('The daemon lock points to live process ' + $lockPid + ', but it is not recognizable as TongPing. Close the old TongPing window or restart Windows; the launcher will not kill an unrelated process.')
+    }
+
+    $rootProcess = $daemonProcess
+    $cursor = $daemonProcess
+    for ($depth = 0; $depth -lt 6; $depth++) {
+        $parentId = [int]$cursor.ParentProcessId
+        if ($parentId -le 0) { break }
+        $parent = Get-ProcessById $parentId
+        if ($null -eq $parent) { break }
+        if (Test-CommandLineFragment $parent '(?i)(?:^|[\\/])scripts[\\/]start\.mjs(?:\s|"|$)') {
+            $rootProcess = $parent
+            break
+        }
+        $cursor = $parent
+    }
+
+    Write-Step ('Stopping the previous TongPing instance safely (PID ' + [int]$rootProcess.ProcessId + ')...')
+    & taskkill.exe /PID ([int]$rootProcess.ProcessId) /T /F *> $null
+    $deadline = [DateTime]::UtcNow.AddSeconds(12)
+    while ([DateTime]::UtcNow -lt $deadline -and $null -ne (Get-ProcessById $lockPid)) {
+        Start-Sleep -Milliseconds 250
+    }
+    if ($null -ne (Get-ProcessById $lockPid)) {
+        throw 'The previous TongPing daemon did not stop. Restart Windows once, then use this launcher again.'
+    }
+    Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
+}
+
 function Stop-ManagedTunnel {
     if ($null -eq $script:WslExe -or -not (Test-Path -LiteralPath $TunnelExe)) { return }
     $tunnelExeWsl = Convert-ToWslPath $TunnelExe
@@ -265,6 +328,7 @@ function Start-QuickTunnel {
 }
 
 function Start-TongPing([string]$PublicOrigin) {
+    Stop-ExistingTongPing
     Stop-ProcessTreeFromFile $TongPingPidFile 'scripts\start.mjs'
     $oldPublicOrigin = [Environment]::GetEnvironmentVariable('TONGPING_PUBLIC_ORIGIN', 'Process')
     try {
@@ -332,7 +396,7 @@ function Start-SecureTunnel([string]$RuntimeKey) {
 
 try {
     Write-Host ''
-    Write-Host 'TongPing + OpenAI Private Tunnel v114' -ForegroundColor Green
+    Write-Host 'TongPing + OpenAI Private Tunnel v115' -ForegroundColor Green
     Write-Host ('Tunnel: ' + $TunnelId)
     Write-Host ''
     New-Item -ItemType Directory -Path $DataDir, $BinDir, $ProfileDir, $LogDir -Force | Out-Null
